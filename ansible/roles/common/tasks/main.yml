@@ -25,14 +25,10 @@
       - container-selinux
       - iscsi-initiator-utils
       - nfs-utils
-      - tar
-      - jq
     state: present
 
 - name: Load kernel modules
-  community.general.modprobe:
-    name: "{{ item }}"
-    state: present
+  ansible.builtin.command: "modprobe {{ item }}"
   loop:
     - br_netfilter
     - overlay
@@ -40,6 +36,7 @@
     - ip_tables
     - iptable_filter
     - iptable_nat
+  changed_when: false
 
 - name: Persist kernel modules
   ansible.builtin.copy:
@@ -54,15 +51,14 @@
     mode: "0644"
 
 - name: Set sysctl parameters
-  ansible.posix.sysctl:
-    name: "{{ item.key }}"
-    value: "{{ item.value }}"
-    sysctl_file: /etc/sysctl.d/k8s.conf
-    reload: true
-  loop:
-    - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
-    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
-    - { key: "net.ipv4.ip_forward", value: "1" }
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+    mode: "0644"
+  notify: reload sysctl
 
 - name: Disable swap
   ansible.builtin.command: swapoff -a
@@ -82,9 +78,15 @@
   ignore_errors: true
 
 - name: Set SELinux to permissive
-  ansible.posix.selinux:
-    policy: targeted
-    state: permissive
+  ansible.builtin.command: setenforce 0
+  changed_when: false
+  failed_when: false
+
+- name: Persist SELinux permissive
+  ansible.builtin.lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX=enforcing'
+    line: 'SELINUX=permissive'
 
 - name: Enable iscsid for Longhorn
   ansible.builtin.systemd:
