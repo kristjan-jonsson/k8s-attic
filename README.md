@@ -55,7 +55,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 - Ansible control machine with:
   ```bash
   pip install ansible kubernetes
-  ansible-galaxy collection install kubernetes.core community.general ansible.posix
+  ansible-galaxy collection install kubernetes.core
   ```
 
 ## Quick Start
