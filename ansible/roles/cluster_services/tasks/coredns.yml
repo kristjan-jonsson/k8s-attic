@@ -1,11 +1,17 @@
 ---
-# CoreDNS custom configuration for service discovery
+# CoreDNS custom configuration - forward *.haaloft.local to BIND
+
+- name: Template CoreDNS custom config
+  ansible.builtin.template:
+    src: coredns-custom.yaml.j2
+    dest: /tmp/coredns-custom.yaml
+    mode: "0644"
 
 - name: Apply CoreDNS custom config
   kubernetes.core.k8s:
     kubeconfig: /home/rke/.kube/config
     state: present
-    src: "{{ playbook_dir }}/../manifests/external-dns/coredns-custom.yaml"
+    src: /tmp/coredns-custom.yaml
 
 - name: Restart CoreDNS to pick up changes
   kubernetes.core.k8s:
@@ -20,3 +26,8 @@
             annotations:
               kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
   ignore_errors: true
+
+- name: Clean up temp file
+  ansible.builtin.file:
+    path: /tmp/coredns-custom.yaml
+    state: absent

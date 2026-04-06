@@ -4,37 +4,49 @@
 # Run: ansible-playbook playbooks/teardown.yml
 #
 # This will:
-#   1. Destroy and undefine all VMs on the hypervisor
-#   2. Delete VM disk images and cloud-init ISOs
-#   3. Remove local kubeconfig and vault credentials
+#   1. Remove DNS records from BIND
+#   2. Destroy and undefine all VMs on the hypervisor
+#   3. Delete VM disk images and cloud-init ISOs
+#   4. Remove local kubeconfig and vault credentials
 #
 # After teardown, you can re-provision from scratch:
 #   ansible-playbook playbooks/provision-vms.yml
 #   ansible-playbook site.yml
 # ============================================================================
 
-- name: Teardown Haaloft K8S Cluster
-  hosts: hypervisor
+- name: Confirm teardown
+  hosts: localhost
   gather_facts: false
-
   tasks:
-    - name: Confirm teardown
+    - name: Prompt for confirmation
       ansible.builtin.pause:
         prompt: |
-          WARNING: This will destroy ALL VMs and data!
+          WARNING: This will destroy ALL VMs, DNS records, and data!
             VMs: {{ vms | map(attribute='name') | join(', ') }}
+            DNS: {{ domain }} zone will be removed from BIND
             Disks, cloud-init ISOs, and all cluster data will be deleted.
 
           Type 'yes' to continue
-
       register: confirm
-      delegate_to: localhost
 
     - name: Abort if not confirmed
       ansible.builtin.fail:
         msg: "Teardown aborted."
       when: confirm.user_input != 'yes'
 
+- name: Remove DNS records from BIND
+  hosts: dns_servers
+  become: true
+  tasks:
+    - name: Clean up DNS zone
+      ansible.builtin.include_role:
+        name: dns
+        tasks_from: cleanup
+
+- name: Teardown VMs on hypervisor
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
     - name: Destroy and remove each VM
       ansible.builtin.include_tasks: teardown-vm-single.yml
       loop: "{{ vms }}"
@@ -61,7 +73,7 @@
           =============================================
             Teardown Complete
           =============================================
-          All VMs and associated disks have been removed.
+          All VMs, disks, and DNS records have been removed.
 
           To rebuild:
             ansible-playbook playbooks/provision-vms.yml

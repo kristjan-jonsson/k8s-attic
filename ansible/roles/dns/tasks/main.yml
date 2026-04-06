@@ -1,0 +1,71 @@
+---
+# ============================================================================
+# Register cluster node IPs and service hostnames in BIND (named)
+#
+# Creates/updates the forward zone for {{ domain }} with:
+#   - A records for each node (rke-01, rke-02, rke-03)
+#   - Round-robin A records for each service hostname
+#   - Wildcard catch-all pointing to all nodes
+#
+# Expects `discovered_vms` fact from discover-vms.yml:
+#   [{ name: "rke-01", role: "server", ip: "192.168.1.x" }, ...]
+# ============================================================================
+
+- name: Ensure bind is installed
+  ansible.builtin.dnf:
+    name:
+      - bind
+      - bind-utils
+    state: present
+
+- name: Generate zone serial (YYYYMMDDNN)
+  ansible.builtin.set_fact:
+    dns_zone_serial: "{{ '%Y%m%d01' | strftime }}"
+
+- name: Deploy forward zone file for {{ domain }}
+  ansible.builtin.template:
+    src: zone-forward.j2
+    dest: "{{ dns_zone_dir }}/{{ dns_zone_file }}"
+    owner: named
+    group: named
+    mode: "0640"
+  notify: reload named
+
+- name: Ensure named.conf includes our zone
+  ansible.builtin.blockinfile:
+    path: /etc/named.conf
+    block: |
+      zone "{{ domain }}" IN {
+          type master;
+          file "{{ dns_zone_file }}";
+          allow-update { none; };
+      };
+    marker: "// {mark} ANSIBLE MANAGED - {{ domain }}"
+    insertafter: EOF
+  notify: reload named
+
+- name: Ensure named listens on all interfaces
+  ansible.builtin.lineinfile:
+    path: /etc/named.conf
+    regexp: '^\s*listen-on port 53'
+    line: "\tlisten-on port 53 { any; };"
+  notify: reload named
+
+- name: Ensure named allows queries from local network
+  ansible.builtin.lineinfile:
+    path: /etc/named.conf
+    regexp: '^\s*allow-query\s'
+    line: "\tallow-query { any; };"
+  notify: reload named
+
+- name: Enable and start named
+  ansible.builtin.systemd:
+    name: named
+    state: started
+    enabled: true
+
+- name: Verify zone resolves
+  ansible.builtin.command: "dig @127.0.0.1 {{ (vms | first).name }}.{{ domain }} +short"
+  register: dig_check
+  changed_when: false
+  failed_when: dig_check.stdout | trim | length == 0

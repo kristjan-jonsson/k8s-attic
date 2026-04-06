@@ -1,0 +1,22 @@
+---
+# BIND zone configuration defaults
+dns_zone_dir: /var/named
+dns_zone_file: "db.{{ domain }}"
+dns_reverse_zone_file: "db.{{ dns_reverse_zone }}"
+dns_serial_format: "%Y%m%d%S"  # YYYYMMDDNN
+dns_ttl: 3600
+dns_refresh: 3600
+dns_retry: 600
+dns_expire: 604800
+dns_minimum: 86400
+
+# SOA record
+dns_soa_ns: "ns1.{{ domain }}"
+dns_soa_email: "admin.{{ domain }}"
+
+# Service hostnames that get wildcard/round-robin A records pointing to all nodes
+dns_service_hosts:
+  - registry    # Harbor
+  - auth        # Keycloak
+  - vault       # Vault
+  - longhorn    # Longhorn UI

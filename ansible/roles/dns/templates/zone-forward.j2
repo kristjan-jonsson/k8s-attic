@@ -1,0 +1,33 @@
+; ============================================================================
+; BIND forward zone for {{ domain }}
+; Managed by Ansible - DO NOT EDIT MANUALLY
+; ============================================================================
+$TTL {{ dns_ttl }}
+@       IN      SOA     {{ dns_soa_ns }}. {{ dns_soa_email }}. (
+                        {{ dns_zone_serial }}  ; serial
+                        {{ dns_refresh }}      ; refresh
+                        {{ dns_retry }}        ; retry
+                        {{ dns_expire }}       ; expire
+                        {{ dns_minimum }}      ; minimum TTL
+                        )
+
+; Nameserver
+@               IN      NS      {{ dns_soa_ns }}.
+ns1             IN      A       {{ dns_server_ip }}
+
+; --- Cluster nodes ---
+{% for vm in discovered_vms %}
+{{ vm.name }}          IN      A       {{ vm.ip }}
+{% endfor %}
+
+; --- Service hostnames (round-robin to all nodes) ---
+{% for svc in dns_service_hosts %}
+{% for vm in discovered_vms %}
+{{ svc }}              IN      A       {{ vm.ip }}
+{% endfor %}
+{% endfor %}
+
+; --- Wildcard catch-all (any undefined *.{{ domain }} → all nodes) ---
+{% for vm in discovered_vms %}
+*               IN      A       {{ vm.ip }}
+{% endfor %}

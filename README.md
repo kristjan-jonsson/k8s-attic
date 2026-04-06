@@ -112,13 +112,17 @@ ansible-playbook site.yml --tags harbor
 ansible-playbook site.yml --tags common
 ```
 
-### 4. Configure DNS
+### 4. DNS (automatic)
 
-Point `*.haaloft.local` to your node IPs. Options:
+DNS is handled automatically. After VM IP discovery, Ansible registers:
+- A records for each node (`rke-01.haaloft.local`, etc.)
+- Round-robin A records for services (`registry`, `auth`, `vault`, `longhorn`)
+- Wildcard catch-all (`*.haaloft.local` → all nodes)
 
-- **Router/Pi-hole/pfSense**: Add wildcard DNS entry (recommended)
-- **CoreDNS**: Edit [manifests/external-dns/coredns-custom.yaml](manifests/external-dns/coredns-custom.yaml) with your node IPs
-- **/etc/hosts**: Add individual entries on your dev machine
+All records are managed in your BIND server and cleaned up on teardown.
+CoreDNS inside the cluster forwards `*.haaloft.local` to BIND so pods can resolve too.
+
+Make sure your clients (dev machine, etc.) use the BIND server for DNS.
 
 ### 5. Access the cluster
 
@@ -259,22 +263,30 @@ k8s-haaloft/
 │   │   ├── provision-vms.yml           # VM creation on KVM host
 │   │   ├── provision-vm-single.yml     # Single VM provisioning (included)
 │   │   ├── discover-vms.yml            # DHCP IP discovery from hypervisor
-│   │   ├── teardown.yml                # Destroy everything
+│   │   ├── teardown.yml                # Destroy everything (VMs + DNS)
 │   │   └── teardown-vm-single.yml      # Single VM teardown (included)
 │   └── roles/
 │       ├── common/                     # Base OS: modules, sysctl, swap, SELinux
 │       ├── rke2_server/                # RKE2 control plane
 │       ├── rke2_agent/                 # RKE2 workers
 │       ├── helm/                       # Helm + chart repos
+│       ├── dns/                        # BIND zone management
+│       │   ├── tasks/
+│       │   │   ├── main.yml            # Create/update zone
+│       │   │   └── cleanup.yml         # Remove zone (teardown)
+│       │   └── templates/
+│       │       └── zone-forward.j2     # Zone file template
 │       ├── cluster_services/           # cert-manager, Longhorn, Vault, Keycloak
-│       │   └── tasks/
-│       │       ├── main.yml
-│       │       ├── ingress.yml
-│       │       ├── cert_manager.yml
-│       │       ├── longhorn.yml
-│       │       ├── vault.yml
-│       │       ├── keycloak.yml
-│       │       └── coredns.yml
+│       │   ├── tasks/
+│       │   │   ├── main.yml
+│       │   │   ├── ingress.yml
+│       │   │   ├── cert_manager.yml
+│       │   │   ├── longhorn.yml
+│       │   │   ├── vault.yml
+│       │   │   ├── keycloak.yml
+│       │   │   └── coredns.yml
+│       │   └── templates/
+│       │       └── coredns-custom.yaml.j2
 │       └── harbor/                     # Container registry
 └── manifests/
     ├── ingress/
@@ -291,11 +303,9 @@ k8s-haaloft/
     │   └── vault-values.yaml
     ├── harbor/
     │   └── harbor-values.yaml
-    ├── cert-manager/
-    │   ├── cert-manager-values.yaml
-    │   └── cluster-issuers.yaml
-    └── external-dns/
-        └── coredns-custom.yaml
+    └── cert-manager/
+        ├── cert-manager-values.yaml
+        └── cluster-issuers.yaml
 ```
 
 ## Customization Checklist
@@ -305,6 +315,7 @@ Before deploying, update these in [ansible/group_vars/all.yml](ansible/group_var
 - [ ] `ssh_public_key` - Your SSH public key
 - [ ] `vm_base_image` - Path to OL9 qcow2 image on KVM host
 - [ ] KVM host IP in `inventory.yml`
+- [ ] DNS server IP in `inventory.yml` and `dns_server_ip` in `group_vars/all.yml`
 - [ ] `acme_email` - Your email for Let's Encrypt (if using)
 - [ ] `keycloak_admin_password` / `keycloak_pg_password`
 - [ ] `harbor_admin_password`

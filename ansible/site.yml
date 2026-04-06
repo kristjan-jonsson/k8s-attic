@@ -12,6 +12,16 @@
 - name: Discover VM IPs
   ansible.builtin.import_playbook: playbooks/discover-vms.yml
 
+# --- Stage 0.5: Register VM IPs in BIND DNS ---
+- name: Register DNS records
+  hosts: dns_servers
+  become: true
+  tags: [dns]
+  vars:
+    discovered_vms: "{{ hostvars[groups['hypervisor'][0]]['discovered_vms'] }}"
+  roles:
+    - dns
+
 # --- Stage 1: Base OS configuration on all nodes ---
 - name: Configure base OS on all cluster nodes
   hosts: rke2_cluster
@@ -85,7 +95,7 @@
             Auth:         https://{{ keycloak_host }}
             Registry:     https://{{ harbor_host }}
 
-          DNS: Point *.{{ domain }} to your node IPs
+          DNS: *.{{ domain }} registered on {{ dns_server_ip }} (BIND)
 
           Push images:
             docker login {{ harbor_host }}

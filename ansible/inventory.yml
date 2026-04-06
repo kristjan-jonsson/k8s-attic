@@ -7,6 +7,13 @@ all:
           ansible_host: 192.168.1.1    # Update with KVM host IP
           ansible_user: root
 
+    # BIND DNS server (for *.haaloft.local registration)
+    dns_servers:
+      hosts:
+        dns-01:
+          ansible_host: 192.168.1.2    # Update with DNS server IP
+          ansible_user: root
+
     # These groups are populated dynamically by provision-vms.yml / site.yml
     # after discovering DHCP-assigned IPs from the hypervisor.
     # You can also hardcode IPs here if you prefer static inventory.

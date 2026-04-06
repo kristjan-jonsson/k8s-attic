@@ -1,0 +1,17 @@
+---
+# ============================================================================
+# Remove cluster DNS records from BIND during teardown
+# ============================================================================
+
+- name: Remove forward zone file
+  ansible.builtin.file:
+    path: "{{ dns_zone_dir }}/{{ dns_zone_file }}"
+    state: absent
+  notify: reload named
+
+- name: Remove zone block from named.conf
+  ansible.builtin.blockinfile:
+    path: /etc/named.conf
+    marker: "// {mark} ANSIBLE MANAGED - {{ domain }}"
+    state: absent
+  notify: reload named
