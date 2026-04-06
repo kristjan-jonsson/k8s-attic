@@ -5,6 +5,8 @@ all:
       hosts:
         kvm-host:
           ansible_host: 192.168.1.1    # Update with KVM host IP
+          ansible_user: your-user      # Update with your KVM host username
+          ansible_become_password: "{{ kvm_become_password }}"
 
     # BIND DNS server (for *.haaloft.local registration)
     dns_servers:

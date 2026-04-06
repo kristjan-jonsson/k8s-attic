@@ -74,24 +74,26 @@ Edit [ansible/group_vars/all.yml](ansible/group_vars/all.yml):
 ```bash
 cd ansible
 
-# Create VMs (waits for DHCP leases automatically)
-ansible-playbook playbooks/provision-vms.yml
+# Create VMs (prompts for KVM host sudo password)
+ansible-playbook playbooks/provision-vms.yml --ask-become-pass
 
 # Deploy K8S + all services (discovers VM IPs from hypervisor automatically)
-ansible-playbook site.yml
+ansible-playbook site.yml --ask-become-pass
 ```
 
 VM IPs are discovered automatically via `virsh domifaddr` on the hypervisor - no manual IP entry needed. The playbooks poll until DHCP leases are assigned.
 
+The `--ask-become-pass` (`-K`) flag prompts for the KVM host sudo password. Cluster VMs use passwordless sudo via cloud-init so the prompt only applies to the KVM host.
+
 ### 3. Teardown and rebuild
 
 ```bash
-# Destroy everything (VMs, disks, local kubeconfig, vault creds)
-ansible-playbook playbooks/teardown.yml
+# Destroy everything (VMs, disks, DNS records, local kubeconfig, vault creds)
+ansible-playbook playbooks/teardown.yml --ask-become-pass
 
 # Rebuild from scratch
-ansible-playbook playbooks/provision-vms.yml
-ansible-playbook site.yml
+ansible-playbook playbooks/provision-vms.yml --ask-become-pass
+ansible-playbook site.yml --ask-become-pass
 ```
 
 The teardown playbook asks for confirmation before destroying anything.
