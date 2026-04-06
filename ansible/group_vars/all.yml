@@ -6,7 +6,8 @@
 domain: haaloft.local
 cluster_name: haaloft
 
-# --- SSH ---
+# --- SSH / User ---
+ansible_user: rke                # SSH user for all hosts (uses sudo for privilege escalation)
 ssh_public_key: "ssh-rsa REPLACE_WITH_YOUR_PUBLIC_KEY"
 
 # --- RKE2 ---
