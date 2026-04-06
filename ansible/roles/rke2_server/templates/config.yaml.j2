@@ -1,0 +1,9 @@
+bind-address: 0.0.0.0
+
+tls-san:
+  - {{ inventory_hostname }}
+  - {{ inventory_hostname }}.{{ domain }}
+  - {{ ansible_host }}
+
+write-kubeconfig-mode: "0644"
+cni: {{ rke2_cni }}

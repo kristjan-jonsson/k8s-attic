@@ -1,0 +1,73 @@
+---
+# ============================================================================
+# Discover DHCP-assigned VM IPs from the hypervisor and register them
+# as in-memory inventory hosts. Include this in any playbook that needs
+# to target the cluster nodes.
+# ============================================================================
+- name: Discover VM IPs from hypervisor
+  hosts: hypervisor
+  gather_facts: false
+
+  tasks:
+    - name: Wait for VMs to get DHCP leases
+      ansible.builtin.shell: |
+        ip=$(virsh domifaddr {{ item.name }} 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+')
+        [ -n "$ip" ] && echo "$ip" || exit 1
+      register: vm_ips
+      loop: "{{ vms }}"
+      retries: 30
+      delay: 10
+      until: vm_ips is not failed
+      changed_when: false
+
+    - name: Build discovered IP map
+      ansible.builtin.set_fact:
+        discovered_vms: >-
+          {{
+            discovered_vms | default([]) + [{
+              'name': item.item.name,
+              'role': item.item.role,
+              'ip': item.stdout | trim
+            }]
+          }}
+      loop: "{{ vm_ips.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Display discovered IPs
+      ansible.builtin.debug:
+        msg: "{{ item.name }} ({{ item.role }}): {{ item.ip }}"
+      loop: "{{ discovered_vms }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Add servers to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.ip }}"
+        groups:
+          - rke2_servers
+          - rke2_cluster
+      loop: "{{ discovered_vms | selectattr('role', 'equalto', 'server') }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Add agents to in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        ansible_host: "{{ item.ip }}"
+        groups:
+          - rke2_agents
+          - rke2_cluster
+      loop: "{{ discovered_vms | selectattr('role', 'equalto', 'agent') }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Wait for SSH to be reachable on all VMs
+      ansible.builtin.wait_for:
+        host: "{{ item.ip }}"
+        port: 22
+        timeout: 120
+      loop: "{{ discovered_vms }}"
+      loop_control:
+        label: "{{ item.name }}"

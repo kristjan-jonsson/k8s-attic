@@ -1,0 +1,62 @@
+---
+# Included task file - provisions a single VM
+
+- name: "Check if VM {{ vm.name }} already exists"
+  ansible.builtin.command: "virsh dominfo {{ vm.name }}"
+  register: vm_exists
+  changed_when: false
+  failed_when: false
+
+- name: "Provision VM {{ vm.name }}"
+  when: vm_exists.rc != 0
+  block:
+    - name: "Copy base image for {{ vm.name }}"
+      ansible.builtin.copy:
+        src: "{{ vm_base_image }}"
+        dest: "{{ vm_libvirt_images }}/{{ vm.name }}.qcow2"
+        remote_src: true
+        mode: "0644"
+
+    - name: "Resize disk for {{ vm.name }}"
+      ansible.builtin.command: "qemu-img resize {{ vm_libvirt_images }}/{{ vm.name }}.qcow2 {{ vm_disk_size }}"
+
+    - name: "Generate cloud-init user-data for {{ vm.name }}"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../cloud-init/user-data.yaml"
+        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}-user-data"
+      vars:
+        HOSTNAME: "{{ vm.name }}"
+        ROLE: "{{ vm.role }}"
+
+    - name: "Copy cloud-init meta-data for {{ vm.name }}"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../cloud-init/meta-data.yaml"
+        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}-meta-data"
+        mode: "0644"
+
+    - name: "Create cloud-init ISO for {{ vm.name }}"
+      ansible.builtin.command: >
+        cloud-localds
+        {{ vm_libvirt_images }}/{{ vm.name }}-cidata.iso
+        {{ ci_tmpdir.path }}/{{ vm.name }}-user-data
+        {{ ci_tmpdir.path }}/{{ vm.name }}-meta-data
+
+    - name: "Create VM {{ vm.name }}"
+      ansible.builtin.command: >
+        virt-install
+        --name {{ vm.name }}
+        --memory {{ vm_memory_mb }}
+        --vcpus {{ vm_vcpus }}
+        --disk {{ vm_libvirt_images }}/{{ vm.name }}.qcow2,device=disk,bus=virtio
+        --disk {{ vm_libvirt_images }}/{{ vm.name }}-cidata.iso,device=cdrom
+        --os-variant {{ vm_os_variant }}
+        --virt-type kvm
+        --graphics none
+        --network bridge={{ vm_bridge }},model=virtio
+        --noautoconsole
+        --import
+
+- name: "VM {{ vm.name }} already exists - skipping"
+  when: vm_exists.rc == 0
+  ansible.builtin.debug:
+    msg: "VM {{ vm.name }} already exists, skipping provisioning."

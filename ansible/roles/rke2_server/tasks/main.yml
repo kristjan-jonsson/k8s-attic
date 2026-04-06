@@ -1,0 +1,102 @@
+---
+# ============================================================================
+# RKE2 Server (Control Plane) Installation
+# ============================================================================
+
+- name: Create RKE2 config directory
+  ansible.builtin.file:
+    path: /etc/rancher/rke2
+    state: directory
+    mode: "0755"
+
+- name: Deploy RKE2 server config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/rke2/config.yaml
+    mode: "0644"
+
+- name: Download RKE2 installer
+  ansible.builtin.get_url:
+    url: https://get.rke2.io
+    dest: /tmp/rke2-install.sh
+    mode: "0755"
+
+- name: Install RKE2 server
+  ansible.builtin.command: /tmp/rke2-install.sh
+  environment:
+    INSTALL_RKE2_VERSION: "{{ rke2_version | default(omit) }}"
+  args:
+    creates: /usr/local/bin/rke2
+
+- name: Enable and start RKE2 server
+  ansible.builtin.systemd:
+    name: rke2-server
+    state: started
+    enabled: true
+
+- name: Wait for RKE2 to be ready
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/rke2/server/node-token
+    timeout: 300
+
+- name: Wait for kubeconfig
+  ansible.builtin.wait_for:
+    path: /etc/rancher/rke2/rke2.yaml
+    timeout: 120
+
+- name: Read node token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/rke2/server/node-token
+  register: rke2_node_token_raw
+
+- name: Set node token fact
+  ansible.builtin.set_fact:
+    rke2_node_token: "{{ rke2_node_token_raw.content | b64decode | trim }}"
+
+- name: Create .kube directory for rke user
+  ansible.builtin.file:
+    path: /home/rke/.kube
+    state: directory
+    owner: rke
+    group: rke
+    mode: "0700"
+
+- name: Copy kubeconfig for rke user
+  ansible.builtin.copy:
+    src: /etc/rancher/rke2/rke2.yaml
+    dest: /home/rke/.kube/config
+    remote_src: true
+    owner: rke
+    group: rke
+    mode: "0600"
+
+- name: Update kubeconfig server address
+  ansible.builtin.replace:
+    path: /home/rke/.kube/config
+    regexp: '127\.0\.0\.1'
+    replace: "{{ ansible_host }}"
+
+- name: Fetch kubeconfig to local machine
+  ansible.builtin.fetch:
+    src: /home/rke/.kube/config
+    dest: "{{ playbook_dir }}/../kubeconfig"
+    flat: true
+
+- name: Add RKE2 binaries to PATH for rke user
+  ansible.builtin.blockinfile:
+    path: /home/rke/.bashrc
+    block: |
+      export PATH=$PATH:/var/lib/rancher/rke2/bin
+      export KUBECONFIG=$HOME/.kube/config
+      alias k=kubectl
+      source <(kubectl completion bash)
+      complete -o default -F __start_kubectl k
+    marker: "# {mark} RKE2 PATH"
+
+- name: Wait for node to be Ready
+  ansible.builtin.command: >
+    /var/lib/rancher/rke2/bin/kubectl
+    --kubeconfig /etc/rancher/rke2/rke2.yaml
+    wait --for=condition=Ready node/{{ inventory_hostname }}
+    --timeout=300s
+  changed_when: false

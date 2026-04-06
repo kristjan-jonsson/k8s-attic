@@ -1,0 +1,5 @@
+---
+- name: restart rke2
+  ansible.builtin.systemd:
+    name: "{{ 'rke2-server' if inventory_hostname in groups['rke2_servers'] else 'rke2-agent' }}"
+    state: restarted

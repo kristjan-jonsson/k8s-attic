@@ -1,0 +1,39 @@
+# ============================================================================
+# CoreDNS Custom Configuration for Service Discovery
+# RKE2 ships CoreDNS by default. This adds custom DNS entries
+# for your *.haaloft.local services.
+# ============================================================================
+
+# Option 1: Custom CoreDNS entries via ConfigMap
+# This adds static DNS records for services you want to resolve by name
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rke2-coredns-rke2-coredns-custom
+  namespace: kube-system
+data:
+  haaloft.server: |
+    haaloft.local:53 {
+      errors
+      cache 30
+      # Point all *.haaloft.local to your ingress node IP(s)
+      # Replace with your actual node IPs
+      template IN A haaloft.local {
+        answer "{{ .Name }} 60 IN A 192.168.1.100"
+        answer "{{ .Name }} 60 IN A 192.168.1.101"
+        answer "{{ .Name }} 60 IN A 192.168.1.102"
+      }
+    }
+
+---
+# Option 2: If you have a separate DNS server (e.g., Pi-hole, pfSense),
+# configure it to point *.haaloft.local to your node IPs instead.
+# This is generally the better approach for a home lab.
+#
+# In Pi-hole / dnsmasq, add:
+#   address=/haaloft.local/192.168.1.100
+#
+# In pfSense / Unbound, add a Host Override:
+#   Host: *
+#   Domain: haaloft.local
+#   IP: 192.168.1.100

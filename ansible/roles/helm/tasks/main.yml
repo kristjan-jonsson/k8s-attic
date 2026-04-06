@@ -1,0 +1,40 @@
+---
+# ============================================================================
+# Install Helm and add required repos
+# Runs on rke2 server node
+# ============================================================================
+
+- name: Check if Helm is installed
+  ansible.builtin.command: helm version --short
+  register: helm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Helm
+  when: helm_check.rc != 0
+  block:
+    - name: Download Helm installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm.sh
+        mode: "0755"
+
+    - name: Run Helm installer
+      ansible.builtin.command: /tmp/get-helm.sh
+      environment:
+        KUBECONFIG: /home/rke/.kube/config
+
+- name: Add Helm repositories
+  kubernetes.core.helm_repository:
+    name: "{{ item.name }}"
+    repo_url: "{{ item.url }}"
+  loop:
+    - { name: jetstack, url: "https://charts.jetstack.io" }
+    - { name: longhorn, url: "https://charts.longhorn.io" }
+    - { name: hashicorp, url: "https://helm.releases.hashicorp.com" }
+    - { name: bitnami, url: "https://charts.bitnami.com/bitnami" }
+    - { name: harbor, url: "https://helm.goharbor.io" }
+  become: true
+  become_user: rke
+  environment:
+    KUBECONFIG: /home/rke/.kube/config

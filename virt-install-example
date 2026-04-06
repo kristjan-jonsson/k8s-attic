@@ -1,0 +1,15 @@
+for i in rke-01 rke-02 rke-03; do
+
+
+cp OL9U4_x86_64-kvm-b234.qcow2 /var/lib/libvirt/images/${i}.qcow2
+
+virt-install --name ${i} \
+    --memory 16384 \
+    --vcpus 2 \
+    --disk /var/lib/libvirt/images/${i}.qcow2,device=disk,bus=virtio \
+    --disk /var/lib/libvirt/images/vm-01.iso,device=cdrom \
+    --os-variant ol9.3 \
+    --virt-type kvm --graphics none \
+    --network bridge=br0,model=virtio \
+    --noautoconsole \
+    --import

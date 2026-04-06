@@ -1,0 +1,22 @@
+---
+# CoreDNS custom configuration for service discovery
+
+- name: Apply CoreDNS custom config
+  kubernetes.core.k8s:
+    kubeconfig: /home/rke/.kube/config
+    state: present
+    src: "{{ playbook_dir }}/../manifests/external-dns/coredns-custom.yaml"
+
+- name: Restart CoreDNS to pick up changes
+  kubernetes.core.k8s:
+    kubeconfig: /home/rke/.kube/config
+    kind: Deployment
+    namespace: kube-system
+    name: rke2-coredns-rke2-coredns
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
+  ignore_errors: true

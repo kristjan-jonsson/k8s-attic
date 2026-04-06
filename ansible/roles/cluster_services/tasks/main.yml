@@ -1,0 +1,23 @@
+---
+# ============================================================================
+# Deploy all cluster services via Helm
+# Runs on rke2 server node
+# ============================================================================
+
+- name: Include NGINX Ingress configuration
+  ansible.builtin.include_tasks: ingress.yml
+
+- name: Include cert-manager
+  ansible.builtin.include_tasks: cert_manager.yml
+
+- name: Include Longhorn storage
+  ansible.builtin.include_tasks: longhorn.yml
+
+- name: Include Vault
+  ansible.builtin.include_tasks: vault.yml
+
+- name: Include Keycloak
+  ansible.builtin.include_tasks: keycloak.yml
+
+- name: Include CoreDNS custom config
+  ansible.builtin.include_tasks: coredns.yml

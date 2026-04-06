@@ -1,0 +1,7 @@
+mirrors:
+  "{{ harbor_host }}":
+    endpoint:
+      - "https://{{ harbor_host }}"
+  docker.io:
+    endpoint:
+      - "https://{{ harbor_host }}/v2/dockerhub-proxy"

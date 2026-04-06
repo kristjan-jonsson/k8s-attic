@@ -1,0 +1,45 @@
+---
+# Included task file - destroys and cleans up a single VM
+
+- name: "Check if VM {{ vm.name }} exists"
+  ansible.builtin.command: "virsh dominfo {{ vm.name }}"
+  register: vm_exists
+  changed_when: false
+  failed_when: false
+
+- name: "Teardown VM {{ vm.name }}"
+  when: vm_exists.rc == 0
+  block:
+    - name: "Check if VM {{ vm.name }} is running"
+      ansible.builtin.command: "virsh domstate {{ vm.name }}"
+      register: vm_state
+      changed_when: false
+
+    - name: "Force stop VM {{ vm.name }}"
+      ansible.builtin.command: "virsh destroy {{ vm.name }}"
+      when: "'running' in vm_state.stdout"
+      failed_when: false
+
+    - name: "Undefine VM {{ vm.name }} (remove all storage)"
+      ansible.builtin.command: "virsh undefine {{ vm.name }} --remove-all-storage --nvram"
+      failed_when: false
+
+    # Belt and suspenders - remove disks even if undefine didn't clean them
+    - name: "Remove disk image for {{ vm.name }}"
+      ansible.builtin.file:
+        path: "{{ vm_libvirt_images }}/{{ vm.name }}.qcow2"
+        state: absent
+
+    - name: "Remove cloud-init ISO for {{ vm.name }}"
+      ansible.builtin.file:
+        path: "{{ vm_libvirt_images }}/{{ vm.name }}-cidata.iso"
+        state: absent
+
+    - name: "VM {{ vm.name }} destroyed and cleaned up"
+      ansible.builtin.debug:
+        msg: "VM {{ vm.name }} has been removed."
+
+- name: "VM {{ vm.name }} does not exist - nothing to teardown"
+  when: vm_exists.rc != 0
+  ansible.builtin.debug:
+    msg: "VM {{ vm.name }} not found, skipping."

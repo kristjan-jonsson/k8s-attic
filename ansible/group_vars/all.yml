@@ -1,0 +1,50 @@
+# ============================================================================
+# Global variables for the Haaloft K8S cluster
+# ============================================================================
+
+# --- Domain & Networking ---
+domain: haaloft.local
+cluster_name: haaloft
+
+# --- SSH ---
+ssh_public_key: "ssh-rsa REPLACE_WITH_YOUR_PUBLIC_KEY"
+
+# --- RKE2 ---
+rke2_version: ""  # Leave empty for latest stable
+rke2_cni: canal
+
+# --- VM Provisioning ---
+vm_base_image: /path/to/OL9U4_x86_64-kvm-b234.qcow2
+vm_libvirt_images: /var/lib/libvirt/images
+vm_bridge: br0
+vm_memory_mb: 16384
+vm_vcpus: 2
+vm_disk_size: 100G
+vm_os_variant: ol9.3
+
+vms:
+  - name: rke-01
+    role: server
+  - name: rke-02
+    role: agent
+  - name: rke-03
+    role: agent
+
+# --- Service URLs ---
+harbor_host: "registry.{{ domain }}"
+keycloak_host: "auth.{{ domain }}"
+vault_host: "vault.{{ domain }}"
+longhorn_host: "longhorn.{{ domain }}"
+
+# --- cert-manager ---
+cert_issuer: haaloft-ca-issuer
+acme_email: your-email@example.com
+
+# --- Keycloak ---
+keycloak_admin_user: admin
+keycloak_admin_password: "changeme-use-vault-secret"
+keycloak_pg_password: "changeme-pg-keycloak"
+
+# --- Harbor ---
+harbor_admin_password: "changeme-harbor-admin"
+harbor_storage_size: 50Gi

@@ -1,0 +1,102 @@
+---
+# ============================================================================
+# Common OS configuration for all RKE2 nodes
+# ============================================================================
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Update /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ ansible_host }} {{ inventory_hostname }} {{ inventory_hostname }}.{{ domain }}"
+    state: present
+
+- name: Install required packages
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - wget
+      - vim
+      - git
+      - bash-completion
+      - iptables
+      - container-selinux
+      - iscsi-initiator-utils
+      - nfs-utils
+      - tar
+      - jq
+    state: present
+
+- name: Load kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+    - iscsi_tcp
+    - ip_tables
+    - iptable_filter
+    - iptable_nat
+
+- name: Persist kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      br_netfilter
+      overlay
+      iscsi_tcp
+      ip_tables
+      iptable_filter
+      iptable_nat
+    mode: "0644"
+
+- name: Set sysctl parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/k8s.conf
+    reload: true
+  loop:
+    - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
+    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { key: "net.ipv4.ip_forward", value: "1" }
+
+- name: Disable swap
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+
+- name: Remove swap from fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '\sswap\s'
+    state: absent
+
+- name: Disable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Set SELinux to permissive
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+
+- name: Enable iscsid for Longhorn
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: true
+
+- name: Configure NetworkManager for RKE2 CNI
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:cali*;interface-name:flannel*
+    mode: "0644"
+  notify: restart networkmanager

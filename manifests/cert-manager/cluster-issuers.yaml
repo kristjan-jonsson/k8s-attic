@@ -1,0 +1,78 @@
+# ============================================================================
+# ClusterIssuers for cert-manager
+# Apply AFTER cert-manager is installed and running
+# ============================================================================
+
+# --- Self-signed issuer (for internal/dev use) ---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+
+---
+# --- Internal CA (recommended for home lab .local domains) ---
+# Step 1: Create a self-signed CA certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: haaloft-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: Haaloft Home Lab CA
+  secretName: haaloft-ca-secret
+  duration: 87600h # 10 years
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+
+---
+# Step 2: Create a ClusterIssuer using the CA
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: haaloft-ca-issuer
+spec:
+  ca:
+    secretName: haaloft-ca-secret
+
+---
+# --- Let's Encrypt (for publicly reachable domains) ---
+# Only use this if your cluster is accessible from the internet
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Replace with your email
+    email: your-email@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+
+---
+# Let's Encrypt staging (for testing - higher rate limits)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: your-email@example.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

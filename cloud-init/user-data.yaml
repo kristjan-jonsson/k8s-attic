@@ -1,0 +1,72 @@
+#cloud-config
+
+hostname: {{ HOSTNAME }}
+fqdn: {{ HOSTNAME }}.{{ domain }}
+manage_etc_hosts: true
+
+users:
+  - name: rke
+    groups: [wheel, docker]
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - {{ ssh_public_key }}
+
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - wget
+  - vim
+  - git
+  - bash-completion
+  - iptables
+  - container-selinux
+  - iscsi-initiator-utils  # Required for Longhorn
+  - nfs-utils
+
+# Kernel modules required for K8S and Longhorn
+write_files:
+  - path: /etc/modules-load.d/k8s.conf
+    content: |
+      br_netfilter
+      overlay
+      ip_tables
+      iptable_filter
+      iptable_nat
+      iscsi_tcp
+
+  - path: /etc/sysctl.d/k8s.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables  = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward                 = 1
+
+  - path: /etc/NetworkManager/conf.d/rke2-canal.conf
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:cali*;interface-name:flannel*
+
+runcmd:
+  # Load kernel modules
+  - modprobe br_netfilter
+  - modprobe overlay
+  - modprobe iscsi_tcp
+  - sysctl --system
+
+  # Disable swap
+  - swapoff -a
+  - sed -i '/swap/d' /etc/fstab
+
+  # Disable firewalld (RKE2 manages its own iptables rules)
+  - systemctl disable --now firewalld || true
+
+  # Enable iscsid for Longhorn
+  - systemctl enable --now iscsid
+
+  # Set SELinux to permissive (RKE2 supports enforcing, but permissive is simpler for home lab)
+  - setenforce 0
+  - sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+
+  # Signal that cloud-init is done
+  - touch /var/lib/cloud/instance/cloud-init-done

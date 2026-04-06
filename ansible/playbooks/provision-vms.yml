@@ -1,0 +1,43 @@
+---
+# ============================================================================
+# Provision KVM virtual machines for the RKE2 cluster
+# Run: ansible-playbook playbooks/provision-vms.yml
+# ============================================================================
+- name: Provision VMs on KVM hypervisor
+  hosts: hypervisor
+  gather_facts: true
+
+  tasks:
+    - name: Check base image exists
+      ansible.builtin.stat:
+        path: "{{ vm_base_image }}"
+      register: base_image
+      failed_when: not base_image.stat.exists
+
+    - name: Install cloud-init tools
+      ansible.builtin.dnf:
+        name:
+          - cloud-utils-growpart
+          - genisoimage
+        state: present
+
+    - name: Create cloud-init temp directory
+      ansible.builtin.tempfile:
+        state: directory
+        prefix: cloudinit_
+      register: ci_tmpdir
+
+    - name: Provision each VM
+      ansible.builtin.include_tasks: provision-vm-single.yml
+      loop: "{{ vms }}"
+      loop_control:
+        loop_var: vm
+
+    - name: Cleanup temp directory
+      ansible.builtin.file:
+        path: "{{ ci_tmpdir.path }}"
+        state: absent
+
+# Discover IPs after provisioning
+- name: Discover provisioned VM IPs
+  ansible.builtin.import_playbook: discover-vms.yml

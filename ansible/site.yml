@@ -1,0 +1,93 @@
+---
+# ============================================================================
+# Haaloft K8S Cluster - Master Playbook
+#
+# Full deploy (VMs exist):  ansible-playbook site.yml
+# Provision + deploy:       ansible-playbook playbooks/provision-vms.yml && ansible-playbook site.yml
+# Just services:            ansible-playbook site.yml --tags "services"
+# Teardown everything:      ansible-playbook playbooks/teardown.yml
+# ============================================================================
+
+# --- Stage 0: Discover DHCP-assigned VM IPs from hypervisor ---
+- name: Discover VM IPs
+  ansible.builtin.import_playbook: playbooks/discover-vms.yml
+
+# --- Stage 1: Base OS configuration on all nodes ---
+- name: Configure base OS on all cluster nodes
+  hosts: rke2_cluster
+  become: true
+  tags: [common]
+  roles:
+    - common
+
+# --- Stage 2: Install RKE2 server (control plane) ---
+- name: Install RKE2 server
+  hosts: rke2_servers
+  become: true
+  tags: [rke2, rke2-server]
+  roles:
+    - rke2_server
+
+# --- Stage 3: Install RKE2 agents (workers) ---
+- name: Install RKE2 agents
+  hosts: rke2_agents
+  become: true
+  serial: 1  # Join one at a time
+  tags: [rke2, rke2-agent]
+  roles:
+    - rke2_agent
+
+# --- Stage 4: Install Helm ---
+- name: Install Helm
+  hosts: rke2_servers
+  become: true
+  tags: [helm, services]
+  roles:
+    - helm
+
+# --- Stage 5: Deploy cluster services ---
+- name: Deploy cluster services
+  hosts: rke2_servers
+  become: true
+  tags: [services]
+  roles:
+    - cluster_services
+
+# --- Stage 6: Deploy Harbor container registry ---
+- name: Deploy Harbor registry
+  hosts: rke2_servers
+  become: true
+  tags: [services, harbor]
+  roles:
+    - harbor
+
+# --- Final: Display summary ---
+- name: Deployment summary
+  hosts: rke2_servers
+  become: false
+  tags: [always]
+  tasks:
+    - name: Show cluster info
+      ansible.builtin.debug:
+        msg: |
+          =============================================
+            Haaloft K8S Cluster Deployed!
+          =============================================
+
+          Kubeconfig saved to: kubeconfig
+            export KUBECONFIG={{ playbook_dir }}/../kubeconfig
+
+          Services:
+            Ingress:      NGINX (ports 80/443 on all nodes)
+            Storage:      https://{{ longhorn_host }}
+            Certificates: cert-manager ({{ cert_issuer }})
+            Secrets:      https://{{ vault_host }}
+            Auth:         https://{{ keycloak_host }}
+            Registry:     https://{{ harbor_host }}
+
+          DNS: Point *.{{ domain }} to your node IPs
+
+          Push images:
+            docker login {{ harbor_host }}
+            docker tag myapp:latest {{ harbor_host }}/library/myapp:latest
+            docker push {{ harbor_host }}/library/myapp:latest

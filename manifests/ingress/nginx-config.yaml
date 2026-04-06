@@ -1,0 +1,44 @@
+# ============================================================================
+# NGINX Ingress Controller - Custom Configuration
+# RKE2 deploys nginx-ingress by default as a HelmChartConfig
+# This configures it for home lab use with real IPs and proxy protocol
+# ============================================================================
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-ingress-nginx
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    controller:
+      # Use host network so ingress binds to node IPs directly
+      # This is ideal for home lab without a cloud load balancer
+      hostNetwork: true
+      hostPort:
+        enabled: true
+        ports:
+          http: 80
+          https: 443
+
+      # Run on all nodes for HA
+      kind: DaemonSet
+
+      # Preserve client source IPs
+      service:
+        externalTrafficPolicy: Local
+
+      # Enable real IP detection
+      config:
+        use-forwarded-headers: "true"
+        compute-full-forwarded-for: "true"
+        proxy-body-size: "100m"
+        # Default SSL redirect
+        ssl-redirect: "true"
+
+      # Resource limits for home lab
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          memory: 256Mi

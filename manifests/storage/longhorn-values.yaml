@@ -1,0 +1,46 @@
+# ============================================================================
+# Longhorn - Distributed Block Storage for Kubernetes
+# Install: helm install longhorn longhorn/longhorn -n longhorn-system --create-namespace -f longhorn-values.yaml
+# ============================================================================
+
+# Default settings
+defaultSettings:
+  # Keep 2 replicas across nodes for redundancy
+  defaultReplicaCount: 2
+
+  # Backup target (optional - set up NFS or S3 for backups)
+  # backupTarget: nfs://nas.haaloft.local:/backup/longhorn
+  # backupTargetCredentialSecret: ""
+
+  # Guaranteed engine manager CPU
+  guaranteedEngineManagerCPU: 12
+  guaranteedReplicaManagerCPU: 12
+
+  # Storage reservation - leave 15% free on each node
+  storageMinimalAvailablePercentage: 15
+  storageOverProvisioningPercentage: 100
+
+  # Auto-delete workload pod when volume is detached unexpectedly
+  autoDeletePodWhenVolumeDetachedUnexpectedly: true
+
+# Enable the Longhorn UI
+longhornUI:
+  replicas: 1
+
+# Ingress for Longhorn UI
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  host: longhorn.haaloft.local
+  tls: true
+  tlsSecret: longhorn-tls
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+# Resource limits suitable for home lab
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

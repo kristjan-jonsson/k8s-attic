@@ -1,0 +1,37 @@
+---
+# ============================================================================
+# Harbor Container Registry
+# ============================================================================
+
+- name: Install Harbor
+  kubernetes.core.helm:
+    name: harbor
+    chart_ref: harbor/harbor
+    release_namespace: harbor
+    create_namespace: true
+    kubeconfig: /home/rke/.kube/config
+    values_files:
+      - "{{ playbook_dir }}/../manifests/harbor/harbor-values.yaml"
+    wait: true
+    wait_timeout: 600s
+
+- name: Display Harbor info
+  ansible.builtin.debug:
+    msg: |
+      Harbor deployed!
+      UI:       https://{{ harbor_host }}
+      User:     admin
+      Password: {{ harbor_admin_password }}
+
+      To use from your nodes, add the registry as insecure or trust the CA:
+        1. Trust CA: copy the haaloft-ca cert to /etc/pki/ca-trust/source/anchors/ and run update-ca-trust
+        2. Or add to containerd config (done automatically by configure-containerd task)
+
+- name: Configure containerd to trust Harbor registry on all nodes
+  ansible.builtin.template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/rke2/registries.yaml
+    mode: "0644"
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['rke2_cluster'] }}"
+  notify: restart rke2

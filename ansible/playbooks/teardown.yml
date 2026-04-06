@@ -1,0 +1,68 @@
+---
+# ============================================================================
+# Teardown - Destroy everything and clean up
+# Run: ansible-playbook playbooks/teardown.yml
+#
+# This will:
+#   1. Destroy and undefine all VMs on the hypervisor
+#   2. Delete VM disk images and cloud-init ISOs
+#   3. Remove local kubeconfig and vault credentials
+#
+# After teardown, you can re-provision from scratch:
+#   ansible-playbook playbooks/provision-vms.yml
+#   ansible-playbook site.yml
+# ============================================================================
+
+- name: Teardown Haaloft K8S Cluster
+  hosts: hypervisor
+  gather_facts: false
+
+  tasks:
+    - name: Confirm teardown
+      ansible.builtin.pause:
+        prompt: |
+          WARNING: This will destroy ALL VMs and data!
+            VMs: {{ vms | map(attribute='name') | join(', ') }}
+            Disks, cloud-init ISOs, and all cluster data will be deleted.
+
+          Type 'yes' to continue
+
+      register: confirm
+      delegate_to: localhost
+
+    - name: Abort if not confirmed
+      ansible.builtin.fail:
+        msg: "Teardown aborted."
+      when: confirm.user_input != 'yes'
+
+    - name: Destroy and remove each VM
+      ansible.builtin.include_tasks: teardown-vm-single.yml
+      loop: "{{ vms }}"
+      loop_control:
+        loop_var: vm
+
+    - name: Remove local kubeconfig
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../../kubeconfig"
+        state: absent
+      delegate_to: localhost
+      become: false
+
+    - name: Remove local vault credentials
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../../.vault-credentials"
+        state: absent
+      delegate_to: localhost
+      become: false
+
+    - name: Teardown complete
+      ansible.builtin.debug:
+        msg: |
+          =============================================
+            Teardown Complete
+          =============================================
+          All VMs and associated disks have been removed.
+
+          To rebuild:
+            ansible-playbook playbooks/provision-vms.yml
+            ansible-playbook site.yml

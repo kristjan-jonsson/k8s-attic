@@ -1,0 +1,3 @@
+.vault-credentials
+kubeconfig
+*.retry

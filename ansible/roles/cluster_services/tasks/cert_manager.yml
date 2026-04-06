@@ -1,0 +1,26 @@
+---
+# cert-manager installation and configuration
+
+- name: Install cert-manager
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    release_namespace: cert-manager
+    create_namespace: true
+    kubeconfig: /home/rke/.kube/config
+    values_files:
+      - "{{ playbook_dir }}/../manifests/cert-manager/cert-manager-values.yaml"
+    set_values:
+      - value: crds.enabled=true
+    wait: true
+    wait_timeout: 300s
+
+- name: Wait for cert-manager webhook
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Apply cluster issuers
+  kubernetes.core.k8s:
+    kubeconfig: /home/rke/.kube/config
+    state: present
+    src: "{{ playbook_dir }}/../manifests/cert-manager/cluster-issuers.yaml"

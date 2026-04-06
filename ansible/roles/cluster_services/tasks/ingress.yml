@@ -1,0 +1,8 @@
+---
+# NGINX Ingress Controller configuration (RKE2 built-in)
+
+- name: Apply NGINX Ingress custom configuration
+  kubernetes.core.k8s:
+    kubeconfig: /home/rke/.kube/config
+    state: present
+    src: "{{ playbook_dir }}/../manifests/ingress/nginx-config.yaml"
