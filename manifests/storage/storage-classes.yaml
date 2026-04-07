@@ -15,10 +15,7 @@ reclaimPolicy: Retain  # Don't delete data when PVC is deleted
 parameters:
   numberOfReplicas: "2"
   staleReplicaTimeout: "2880"
-  fsType: "ext4"
-  # Faster disk access for DB workloads
-  diskSelector: ""
-  nodeSelector: ""
+  fsType: "xfs"
 
 ---
 # Single-replica storage for non-critical data (caches, temp files)
@@ -32,4 +29,4 @@ reclaimPolicy: Delete
 parameters:
   numberOfReplicas: "1"
   staleReplicaTimeout: "2880"
-  fsType: "ext4"
+  fsType: "xfs"
