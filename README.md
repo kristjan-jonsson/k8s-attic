@@ -52,10 +52,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 - RHEL/Oracle Linux KVM host with `libvirt`, `qemu-kvm`, `virt-install`
 - Oracle Linux 9 cloud image (`OL9U4_x86_64-kvm-b234.qcow2`)
 - Bridge network (`br0`) configured on the KVM host
-- Ansible control machine with:
-  ```bash
-  pip install ansible kubernetes
-  ansible-galaxy collection install kubernetes.core
+- Ansible control machine on KVM host
   ```
 
 ## Quick Start
