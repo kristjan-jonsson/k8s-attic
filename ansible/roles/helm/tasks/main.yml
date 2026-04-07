@@ -9,6 +9,8 @@
   register: helm_check
   changed_when: false
   failed_when: false
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
 
 - name: Install Helm
   when: helm_check.rc != 0
@@ -24,24 +26,21 @@
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-- name: Install Python kubernetes library
-  ansible.builtin.pip:
-    name:
-      - kubernetes
-      - PyYAML
-    state: present
-
 - name: Add Helm repositories
-  kubernetes.core.helm_repository:
-    name: "{{ item.name }}"
-    repo_url: "{{ item.url }}"
+  ansible.builtin.command: "helm repo add {{ item.name }} {{ item.url }}"
   loop:
     - { name: jetstack, url: "https://charts.jetstack.io" }
     - { name: longhorn, url: "https://charts.longhorn.io" }
     - { name: hashicorp, url: "https://helm.releases.hashicorp.com" }
     - { name: bitnami, url: "https://charts.bitnami.com/bitnami" }
     - { name: harbor, url: "https://helm.goharbor.io" }
-  become: true
-  become_user: rke
   environment:
-    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
