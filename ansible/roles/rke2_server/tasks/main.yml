@@ -28,21 +28,44 @@
   args:
     creates: /usr/local/bin/rke2
 
-- name: Enable and start RKE2 server
+- name: Override RKE2 server systemd timeout
+  ansible.builtin.file:
+    path: /etc/systemd/system/rke2-server.service.d
+    state: directory
+    mode: "0755"
+
+- name: Set RKE2 server startup timeout to 10 minutes
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/rke2-server.service.d/override.conf
+    content: |
+      [Service]
+      TimeoutStartSec=600
+    mode: "0644"
+
+- name: Reload systemd
+  ansible.builtin.command: systemctl daemon-reload
+  changed_when: false
+
+- name: Enable rke2-server service
   ansible.builtin.systemd:
     name: rke2-server
-    state: started
     enabled: true
 
-- name: Wait for RKE2 to be ready
+- name: Start rke2-server
+  ansible.builtin.command: systemctl start rke2-server
+  async: 600
+  poll: 0
+  register: rke2_start
+
+- name: Wait for node token (RKE2 bootstrap complete)
   ansible.builtin.wait_for:
     path: /var/lib/rancher/rke2/server/node-token
-    timeout: 300
+    timeout: 600
 
 - name: Wait for kubeconfig
   ansible.builtin.wait_for:
     path: /etc/rancher/rke2/rke2.yaml
-    timeout: 120
+    timeout: 60
 
 - name: Read node token
   ansible.builtin.slurp:
@@ -92,6 +115,12 @@
       source <(kubectl completion bash)
       complete -o default -F __start_kubectl k
     marker: "# {mark} RKE2 PATH"
+
+- name: Fix kubeconfig server address for local use
+  ansible.builtin.replace:
+    path: /etc/rancher/rke2/rke2.yaml
+    regexp: 'https://0\.0\.0\.0:'
+    replace: 'https://127.0.0.1:'
 
 - name: Wait for node to be Ready
   ansible.builtin.command: >
