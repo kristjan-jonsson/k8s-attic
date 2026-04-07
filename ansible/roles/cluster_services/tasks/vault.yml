@@ -6,17 +6,22 @@
     helm upgrade --install vault hashicorp/vault
     --namespace vault --create-namespace
     --values /tmp/k8s-manifests/vault/vault-values.yaml
-    --wait --timeout 5m
+    --timeout 5m
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Wait for Vault pod to be running
   ansible.builtin.shell: |
-    kubectl -n vault wait --for=condition=Ready pod/vault-0 --timeout=120s 2>/dev/null || true
+    phase=$(kubectl -n vault get pod vault-0 -o jsonpath='{.status.phase}' 2>/dev/null)
+    [ "$phase" = "Running" ] && exit 0 || exit 1
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 30
+  delay: 10
+  register: vault_pod
+  until: vault_pod is not failed
   changed_when: false
 
 - name: Check if Vault is initialized
