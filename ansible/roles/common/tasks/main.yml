@@ -26,12 +26,20 @@
       - nfs-utils
     state: present
 
+- name: Install UEK netfilter modules (Oracle Linux)
+  ansible.builtin.shell: |
+    dnf install -y kernel-uek-modules-extra-netfilter-$(uname -r) 2>/dev/null || true
+  changed_when: false
+
 - name: Load kernel modules
   ansible.builtin.command: "modprobe {{ item }}"
   loop:
     - br_netfilter
     - overlay
     - iscsi_tcp
+    - ip_tables
+    - iptable_filter
+    - iptable_nat
   changed_when: false
 
 - name: Persist kernel modules
@@ -41,6 +49,9 @@
       br_netfilter
       overlay
       iscsi_tcp
+      ip_tables
+      iptable_filter
+      iptable_nat
     mode: "0644"
 
 - name: Set sysctl parameters
