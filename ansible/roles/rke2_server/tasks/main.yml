@@ -116,18 +116,12 @@
       complete -o default -F __start_kubectl k
     marker: "# {mark} RKE2 PATH"
 
-- name: Fix kubeconfig server address for local use
-  ansible.builtin.replace:
-    path: /etc/rancher/rke2/rke2.yaml
-    regexp: 'https://0\.0\.0\.0:'
-    replace: 'https://127.0.0.1:'
-
 - name: Wait for node to register and be Ready
   ansible.builtin.shell: |
-    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
-    node=$(/var/lib/rancher/rke2/bin/kubectl get nodes -o name 2>/dev/null | head -1)
+    KC="--kubeconfig /etc/rancher/rke2/rke2.yaml --server https://127.0.0.1:6443"
+    node=$(/var/lib/rancher/rke2/bin/kubectl $KC get nodes -o name 2>/dev/null | head -1)
     [ -z "$node" ] && exit 1
-    /var/lib/rancher/rke2/bin/kubectl wait --for=condition=Ready "$node" --timeout=30s
+    /var/lib/rancher/rke2/bin/kubectl $KC wait --for=condition=Ready "$node" --timeout=30s
   retries: 20
   delay: 15
   register: node_ready
