@@ -1,0 +1,94 @@
+---
+# ============================================================================
+# Update and reboot cluster nodes one at a time (rolling)
+# Run: ansible-playbook playbooks/update-reboot.yml
+#
+# This will:
+#   1. Discover VM IPs
+#   2. For each node (one at a time):
+#      - Cordon (prevent new pods)
+#      - Drain (evict existing pods)
+#      - Run dnf update
+#      - Reboot if needed
+#      - Uncordon (allow pods again)
+# ============================================================================
+
+- name: Discover VM IPs
+  ansible.builtin.import_playbook: discover-vms.yml
+
+- name: Update and reboot cluster nodes (rolling)
+  hosts: rke2_cluster
+  become: true
+  serial: 1
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+  tasks:
+    - name: Get node name in K8S
+      ansible.builtin.shell: |
+        kubectl get nodes -o name | grep "$(hostname)" | head -1
+      register: k8s_node_name
+      changed_when: false
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: "Cordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl cordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    - name: "Drain {{ inventory_hostname }}"
+      ansible.builtin.command: >
+        kubectl drain {{ k8s_node_name.stdout }}
+        --ignore-daemonsets
+        --delete-emptydir-data
+        --timeout=120s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    - name: Run dnf update
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+      register: dnf_update
+
+    - name: Check if reboot is required
+      ansible.builtin.shell: |
+        needs-restarting -r
+      register: reboot_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Reboot {{ inventory_hostname }}"
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+        msg: "Ansible: OS update reboot"
+      when: reboot_check.rc != 0
+
+    - name: Wait for RKE2 to be ready after reboot
+      ansible.builtin.shell: |
+        systemctl is-active rke2-server 2>/dev/null || systemctl is-active rke2-agent 2>/dev/null
+      retries: 30
+      delay: 10
+      register: rke2_ready
+      until: rke2_ready is not failed
+      changed_when: false
+      when: reboot_check.rc != 0
+
+    - name: Wait for node to be Ready in K8S
+      ansible.builtin.shell: |
+        kubectl wait --for=condition=Ready {{ k8s_node_name.stdout }} --timeout=300s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      changed_when: false
+      when: k8s_node_name.stdout | length > 0
+
+    - name: "Uncordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl uncordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    - name: Show update summary
+      ansible.builtin.debug:
+        msg: >
+          {{ inventory_hostname }}: updated={{ dnf_update.changed }},
+          rebooted={{ reboot_check.rc != 0 }}
