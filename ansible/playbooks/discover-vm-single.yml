@@ -1,0 +1,35 @@
+---
+# Included task file - discovers a single VM's IP via MAC → ARP lookup
+
+- name: "Get MAC address for {{ vm.name }}"
+  ansible.builtin.shell: |
+    virsh domiflist {{ vm.name }} 2>/dev/null | awk 'NR>2 && NF {print $5}'
+  register: vm_mac
+  changed_when: false
+
+- name: "Wait for {{ vm.name }} to get DHCP lease"
+  ansible.builtin.shell: |
+    mac="{{ vm_mac.stdout | trim }}"
+    [ -z "$mac" ] && exit 1
+
+    bcast=$(ip -4 addr show {{ vm_bridge }} | grep -oP 'brd \K[\d.]+')
+    ping -b -c 3 -w 2 "$bcast" >/dev/null 2>&1 || true
+
+    ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\d+\.\d+\.\d+\.\d+' | head -1)
+    [ -n "$ip" ] && echo "$ip" || exit 1
+  register: vm_ip
+  retries: 30
+  delay: 10
+  until: vm_ip is not failed
+  changed_when: false
+
+- name: "Register {{ vm.name }} IP"
+  ansible.builtin.set_fact:
+    discovered_vms: >-
+      {{
+        discovered_vms | default([]) + [{
+          'name': vm.name,
+          'role': vm.role,
+          'ip': vm_ip.stdout | trim
+        }]
+      }}
