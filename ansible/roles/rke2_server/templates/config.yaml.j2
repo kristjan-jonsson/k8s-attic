@@ -1,4 +1,5 @@
-bind-address: 0.0.0.0
+advertise-address: {{ ansible_host }}
+node-ip: {{ ansible_host }}
 
 tls-san:
   - {{ inventory_hostname }}
