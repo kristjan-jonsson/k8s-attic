@@ -18,6 +18,13 @@
       - bind-utils
     state: present
 
+- name: Backup named.conf before modifications
+  ansible.builtin.copy:
+    src: /etc/named.conf
+    dest: /etc/named.conf.bak.{{ ansible_date_time.iso8601_basic_short }}
+    remote_src: true
+    mode: "0644"
+
 - name: Generate zone serial (YYYYMMDDNN)
   ansible.builtin.set_fact:
     dns_zone_serial: "{{ '%Y%m%d01' | strftime }}"
@@ -45,18 +52,22 @@
   notify: reload named
 
 - name: Ensure named listens on all interfaces
-  ansible.builtin.lineinfile:
+  ansible.builtin.replace:
     path: /etc/named.conf
-    regexp: '^\s*listen-on port 53'
-    line: "\tlisten-on port 53 { any; };"
+    regexp: '(listen-on port 53\s*\{)[^}]*(\};)'
+    replace: '\1 any; \2'
   notify: reload named
 
 - name: Ensure named allows queries from local network
-  ansible.builtin.lineinfile:
+  ansible.builtin.replace:
     path: /etc/named.conf
-    regexp: '^\s*allow-query\s'
-    line: "\tallow-query { any; };"
+    regexp: '(allow-query\s*\{)[^}]*(\};)'
+    replace: '\1 any; \2'
   notify: reload named
+
+- name: Validate named.conf syntax
+  ansible.builtin.command: named-checkconf /etc/named.conf
+  changed_when: false
 
 - name: Enable and start named
   ansible.builtin.systemd:
