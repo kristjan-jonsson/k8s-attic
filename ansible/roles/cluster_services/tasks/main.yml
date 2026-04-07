@@ -64,6 +64,13 @@
       tags: [monitoring]
   tags: [monitoring]
 
+- name: Include Home Assistant
+  ansible.builtin.include_tasks:
+    file: homeassistant.yml
+    apply:
+      tags: [homeassistant]
+  tags: [homeassistant]
+
 - name: Include demo guestbook app
   ansible.builtin.include_tasks:
     file: demo.yml

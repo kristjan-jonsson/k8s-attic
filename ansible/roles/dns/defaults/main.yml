@@ -21,3 +21,4 @@ dns_service_hosts:
   - vault       # Vault
   - longhorn    # Longhorn UI
   - grafana     # Grafana
+  - home        # Home Assistant

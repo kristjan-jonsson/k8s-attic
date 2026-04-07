@@ -1,0 +1,28 @@
+---
+# Home Assistant
+
+- name: Deploy Home Assistant
+  ansible.builtin.command: >
+    kubectl apply -f /tmp/k8s-manifests/homeassistant/homeassistant-deploy.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Home Assistant to be ready
+  ansible.builtin.shell: |
+    kubectl -n homeassistant wait --for=condition=Available deployment/homeassistant --timeout=180s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: ha_ready
+  until: ha_ready is not failed
+  changed_when: false
+
+- name: Display Home Assistant info
+  ansible.builtin.debug:
+    msg: |
+      Home Assistant deployed!
+      URL: https://home.{{ domain }}
+      First visit will start the onboarding wizard.
