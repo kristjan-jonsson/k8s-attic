@@ -21,6 +21,7 @@
         name:
           - genisoimage
           - qemu-img
+          - nmap
         state: present
 
     - name: Create cloud-init temp directory
