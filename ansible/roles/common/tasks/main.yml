@@ -21,7 +21,6 @@
       - vim
       - git
       - bash-completion
-      - iptables
       - container-selinux
       - iscsi-initiator-utils
       - nfs-utils
@@ -33,9 +32,6 @@
     - br_netfilter
     - overlay
     - iscsi_tcp
-    - ip_tables
-    - iptable_filter
-    - iptable_nat
   changed_when: false
 
 - name: Persist kernel modules
@@ -45,9 +41,6 @@
       br_netfilter
       overlay
       iscsi_tcp
-      ip_tables
-      iptable_filter
-      iptable_nat
     mode: "0644"
 
 - name: Set sysctl parameters
