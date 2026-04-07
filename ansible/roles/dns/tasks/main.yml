@@ -51,12 +51,12 @@
     insertafter: EOF
   notify: reload named
 
-- name: Ensure named listens on all interfaces
-  ansible.builtin.replace:
-    path: /etc/named.conf
-    regexp: '(listen-on port 53\s*\{)[^}]*(\};)'
-    replace: '\1 any; \2'
-  notify: reload named
+# - name: Ensure named listens on all interfaces
+#   ansible.builtin.replace:
+#     path: /etc/named.conf
+#     regexp: '(listen-on port 53\s*\{)[^}]*(\};)'
+#     replace: '\1 any; \2'
+#   notify: reload named
 
 - name: Ensure named allows queries from local network
   ansible.builtin.replace:
@@ -69,11 +69,19 @@
   ansible.builtin.command: named-checkconf /etc/named.conf
   changed_when: false
 
+- name: Flush handlers to reload named now
+  ansible.builtin.meta: flush_handlers
+
 - name: Enable and start named
   ansible.builtin.systemd:
     name: named
     state: started
     enabled: true
+
+- name: Restart named to pick up all changes
+  ansible.builtin.systemd:
+    name: named
+    state: restarted
 
 - name: Verify zone resolves
   ansible.builtin.command: "dig @127.0.0.1 {{ (vms | first).name }}.{{ domain }} +short"
