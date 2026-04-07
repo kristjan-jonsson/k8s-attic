@@ -16,11 +16,11 @@
       register: base_image
       failed_when: not base_image.stat.exists
 
-    - name: Install cloud-init tools
+    - name: Install required tools
       ansible.builtin.dnf:
         name:
-          - cloud-utils-growpart
           - genisoimage
+          - qemu-img
         state: present
 
     - name: Create cloud-init temp directory

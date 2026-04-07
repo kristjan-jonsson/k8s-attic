@@ -20,26 +20,35 @@
     - name: "Resize disk for {{ vm.name }}"
       ansible.builtin.command: "qemu-img resize {{ vm_libvirt_images }}/{{ vm.name }}.qcow2 {{ vm_disk_size }}"
 
+    - name: "Create per-VM cloud-init directory for {{ vm.name }}"
+      ansible.builtin.file:
+        path: "{{ ci_tmpdir.path }}/{{ vm.name }}"
+        state: directory
+        mode: "0755"
+
     - name: "Generate cloud-init user-data for {{ vm.name }}"
       ansible.builtin.template:
         src: "{{ playbook_dir }}/../../cloud-init/user-data.yaml"
-        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}-user-data"
+        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}/user-data"
       vars:
         HOSTNAME: "{{ vm.name }}"
         ROLE: "{{ vm.role }}"
 
-    - name: "Copy cloud-init meta-data for {{ vm.name }}"
+    - name: "Generate cloud-init meta-data for {{ vm.name }}"
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../../cloud-init/meta-data.yaml"
-        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}-meta-data"
+        content: |
+          instance-id: {{ vm.name }}
+          local-hostname: {{ vm.name }}
+        dest: "{{ ci_tmpdir.path }}/{{ vm.name }}/meta-data"
         mode: "0644"
 
     - name: "Create cloud-init ISO for {{ vm.name }}"
       ansible.builtin.command: >
-        cloud-localds
-        {{ vm_libvirt_images }}/{{ vm.name }}-cidata.iso
-        {{ ci_tmpdir.path }}/{{ vm.name }}-user-data
-        {{ ci_tmpdir.path }}/{{ vm.name }}-meta-data
+        genisoimage -output {{ vm_libvirt_images }}/{{ vm.name }}-cidata.iso
+        -volid cidata -joliet -rock
+        user-data meta-data
+      args:
+        chdir: "{{ ci_tmpdir.path }}/{{ vm.name }}"
 
     - name: "Create VM {{ vm.name }}"
       ansible.builtin.command: >
