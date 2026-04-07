@@ -11,7 +11,7 @@ auth:
 
 # Production mode with TLS termination at ingress
 production: true
-proxy: edge
+proxyHeaders: xforwarded
 
 # Use PostgreSQL as the database backend
 postgresql:
