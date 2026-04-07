@@ -74,6 +74,13 @@ alertmanager:
   enabled: false  # Enable later if you want alerting
 
 # --- Node Exporter (runs on all nodes) ---
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: instance
+
 nodeExporter:
   resources:
     requests:
