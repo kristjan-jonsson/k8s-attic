@@ -28,6 +28,9 @@
 - name: Include CoreDNS custom config
   ansible.builtin.include_tasks: coredns.yml
 
+- name: Include monitoring (Prometheus + Grafana)
+  ansible.builtin.include_tasks: monitoring.yml
+
 - name: Clean up manifests from remote
   ansible.builtin.file:
     path: /tmp/k8s-manifests

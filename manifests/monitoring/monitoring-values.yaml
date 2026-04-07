@@ -1,0 +1,106 @@
+# ============================================================================
+# kube-prometheus-stack - Prometheus + Grafana + Node Exporter
+# Chart: prometheus-community/kube-prometheus-stack
+# ============================================================================
+
+# --- Prometheus ---
+prometheus:
+  prometheusSpec:
+    # Retain metrics for 30 days
+    retention: 30d
+    retentionSize: "8GB"
+
+    # Storage for metrics
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Scrape interval
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    # Resource limits
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+
+# --- Grafana ---
+grafana:
+  adminUser: admin
+  adminPassword: changeme-grafana-admin
+
+  persistence:
+    enabled: true
+    storageClassName: longhorn
+    size: 2Gi
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.haaloft.local
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.haaloft.local
+    annotations:
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # Default dashboards are included automatically:
+  # - K8S cluster overview
+  # - Node exporter
+  # - Pod/container metrics
+  # - etcd
+  # - API server
+  # - CoreDNS
+
+# --- Alertmanager ---
+alertmanager:
+  enabled: false  # Enable later if you want alerting
+
+# --- Node Exporter (runs on all nodes) ---
+nodeExporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+# --- Kube State Metrics ---
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# --- Component monitors ---
+kubeApiServer:
+  enabled: true
+kubeControllerManager:
+  enabled: true
+kubeScheduler:
+  enabled: true
+kubeProxy:
+  enabled: true
+kubeEtcd:
+  enabled: true
+coreDns:
+  enabled: true

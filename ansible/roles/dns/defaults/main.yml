@@ -20,3 +20,4 @@ dns_service_hosts:
   - auth        # Keycloak
   - vault       # Vault
   - longhorn    # Longhorn UI
+  - grafana     # Grafana

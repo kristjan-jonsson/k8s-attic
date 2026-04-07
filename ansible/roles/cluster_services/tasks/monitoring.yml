@@ -1,0 +1,47 @@
+---
+# Prometheus + Grafana monitoring stack
+
+- name: Add prometheus-community Helm repo
+  ansible.builtin.command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+
+- name: Install kube-prometheus-stack
+  ansible.builtin.command: >
+    helm upgrade --install monitoring prometheus-community/kube-prometheus-stack
+    --namespace monitoring --create-namespace
+    --values /tmp/k8s-manifests/monitoring/monitoring-values.yaml
+    --timeout 10m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.shell: |
+    kubectl -n monitoring wait --for=condition=Available deployment/monitoring-grafana --timeout=180s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: grafana_ready
+  until: grafana_ready is not failed
+  changed_when: false
+
+- name: Display monitoring info
+  ansible.builtin.debug:
+    msg: |
+      Monitoring stack deployed!
+      Grafana:    https://grafana.{{ domain }}
+      User:       admin
+      Password:   changeme-grafana-admin
+      Prometheus: In-cluster at monitoring-kube-prometheus-prometheus.monitoring:9090
+      Retention:  30 days / 8GB max
