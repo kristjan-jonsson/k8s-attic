@@ -122,10 +122,14 @@
     regexp: 'https://0\.0\.0\.0:'
     replace: 'https://127.0.0.1:'
 
-- name: Wait for node to be Ready
-  ansible.builtin.command: >
-    /var/lib/rancher/rke2/bin/kubectl
-    --kubeconfig /etc/rancher/rke2/rke2.yaml
-    wait --for=condition=Ready node/{{ inventory_hostname }}
-    --timeout=300s
+- name: Wait for node to register and be Ready
+  ansible.builtin.shell: |
+    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+    node=$(/var/lib/rancher/rke2/bin/kubectl get nodes -o name 2>/dev/null | head -1)
+    [ -z "$node" ] && exit 1
+    /var/lib/rancher/rke2/bin/kubectl wait --for=condition=Ready "$node" --timeout=30s
+  retries: 20
+  delay: 15
+  register: node_ready
+  until: node_ready is not failed
   changed_when: false
