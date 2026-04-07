@@ -18,8 +18,8 @@ rke2_cni: canal
 vm_base_image: /path/to/OL9U4_x86_64-kvm-b234.qcow2
 vm_libvirt_images: /var/lib/libvirt/images
 vm_bridge: br0
-vm_memory_mb: 16384
-vm_vcpus: 2
+vm_memory_mb: 24576    # 24GB - comfortable for all services
+vm_vcpus: 4            # 4 vCPUs - avoids timeouts during bootstrap
 vm_disk_size: 100G
 vm_os_variant: ol9.3
 
@@ -51,4 +51,4 @@ keycloak_pg_password: "changeme-pg-keycloak"
 
 # --- Harbor ---
 harbor_admin_password: "changeme-harbor-admin"
-harbor_storage_size: 50Gi
+harbor_storage_size: 10Gi

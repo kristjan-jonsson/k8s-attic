@@ -52,6 +52,14 @@
         state: latest
       register: dnf_update
 
+    - name: Install netfilter modules for new kernel (if kernel was updated)
+      ansible.builtin.shell: |
+        # Find the newest installed kernel and install its netfilter modules
+        new_kernel=$(rpm -q kernel-uek --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort -V | tail -1)
+        dnf install -y "kernel-uek-modules-extra-netfilter-${new_kernel}" 2>/dev/null || true
+      when: dnf_update.changed
+      changed_when: false
+
     - name: Check if reboot is required
       ansible.builtin.shell: |
         needs-restarting -r
@@ -63,6 +71,15 @@
       ansible.builtin.reboot:
         reboot_timeout: 300
         msg: "Ansible: OS update reboot"
+      when: reboot_check.rc != 0
+
+    - name: Load iptables modules after reboot
+      ansible.builtin.command: "modprobe {{ item }}"
+      loop:
+        - ip_tables
+        - iptable_filter
+        - iptable_nat
+      changed_when: false
       when: reboot_check.rc != 0
 
     - name: Wait for RKE2 to be ready after reboot
