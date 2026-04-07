@@ -53,7 +53,6 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 - Oracle Linux 9 cloud image (`OL9U4_x86_64-kvm-b234.qcow2`)
 - Bridge network (`br0`) configured on the KVM host
 - Ansible control machine on KVM host
-  ```
 
 ## Quick Start
 
