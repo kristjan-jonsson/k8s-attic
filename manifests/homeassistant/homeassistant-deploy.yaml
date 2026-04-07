@@ -19,6 +19,42 @@ spec:
       storage: 5Gi
 
 ---
+# ConfigMap to configure HA to trust the reverse proxy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homeassistant-proxy-config
+  namespace: homeassistant
+data:
+  setup-proxy.sh: |
+    #!/bin/sh
+    CONFIG="/config/configuration.yaml"
+    if [ ! -f "$CONFIG" ]; then
+      cat > "$CONFIG" <<'EOF'
+    homeassistant:
+      name: Home
+      external_url: "https://home.haaloft.local"
+      internal_url: "http://homeassistant.homeassistant.svc.cluster.local:80"
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 10.42.0.0/16
+        - 10.43.0.0/16
+        - 127.0.0.1
+    EOF
+    elif ! grep -q "trusted_proxies" "$CONFIG"; then
+      cat >> "$CONFIG" <<'EOF'
+
+    http:
+      use_x_forwarded_for: true
+      trusted_proxies:
+        - 10.42.0.0/16
+        - 10.43.0.0/16
+        - 127.0.0.1
+    EOF
+    fi
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,6 +72,15 @@ spec:
       labels:
         app: homeassistant
     spec:
+      initContainers:
+        - name: setup-proxy
+          image: docker.io/library/busybox:latest
+          command: ["sh", "/scripts/setup-proxy.sh"]
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: scripts
+              mountPath: /scripts
       containers:
         - name: homeassistant
           image: ghcr.io/home-assistant/home-assistant:stable
@@ -54,22 +99,30 @@ spec:
               memory: 256Mi
             limits:
               memory: 512Mi
-          livenessProbe:
+          startupProbe:
             httpGet:
               path: /
               port: http
-            initialDelaySeconds: 60
+            failureThreshold: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: http
-            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
             periodSeconds: 10
       volumes:
         - name: config
           persistentVolumeClaim:
             claimName: homeassistant-config
+        - name: scripts
+          configMap:
+            name: homeassistant-proxy-config
+            defaultMode: 0755
 
 ---
 apiVersion: v1
