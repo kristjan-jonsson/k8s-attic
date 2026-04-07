@@ -1,11 +1,13 @@
 ---
 # ============================================================================
-# Deploy all cluster services via Helm
+# Deploy all cluster services
 # Runs on rke2 server node
 #
-# Tags: ansible-playbook site.yml --tags monitoring
-#       ansible-playbook site.yml --tags keycloak
-#       ansible-playbook site.yml --tags vault
+# Default services always deploy: ingress, cert-manager, longhorn, coredns
+# Optional services controlled by 'services' dict in group_vars/all.yml
+#
+# Tags:  ansible-playbook site.yml --tags monitoring
+#        ansible-playbook site.yml --tags keycloak
 # ============================================================================
 
 - name: Copy manifests to remote node
@@ -14,6 +16,8 @@
     dest: /tmp/k8s-manifests/
     mode: "0644"
   tags: always
+
+# --- Default services (always deployed) ---
 
 - name: Include NGINX Ingress configuration
   ansible.builtin.include_tasks:
@@ -36,20 +40,6 @@
       tags: [longhorn]
   tags: [longhorn]
 
-- name: Include Vault
-  ansible.builtin.include_tasks:
-    file: vault.yml
-    apply:
-      tags: [vault]
-  tags: [vault]
-
-- name: Include Keycloak
-  ansible.builtin.include_tasks:
-    file: keycloak.yml
-    apply:
-      tags: [keycloak]
-  tags: [keycloak]
-
 - name: Include CoreDNS custom config
   ansible.builtin.include_tasks:
     file: coredns.yml
@@ -57,12 +47,31 @@
       tags: [coredns]
   tags: [coredns]
 
+# --- Optional services (toggle in group_vars/all.yml) ---
+
+- name: Include Vault
+  ansible.builtin.include_tasks:
+    file: vault.yml
+    apply:
+      tags: [vault]
+  tags: [vault]
+  when: services.vault | default(false)
+
+- name: Include Keycloak
+  ansible.builtin.include_tasks:
+    file: keycloak.yml
+    apply:
+      tags: [keycloak]
+  tags: [keycloak]
+  when: services.keycloak | default(false)
+
 - name: Include monitoring (Prometheus + Grafana)
   ansible.builtin.include_tasks:
     file: monitoring.yml
     apply:
       tags: [monitoring]
   tags: [monitoring]
+  when: services.monitoring | default(false)
 
 - name: Include Home Assistant
   ansible.builtin.include_tasks:
@@ -70,13 +79,9 @@
     apply:
       tags: [homeassistant]
   tags: [homeassistant]
+  when: services.homeassistant | default(false)
 
-- name: Include demo guestbook app
-  ansible.builtin.include_tasks:
-    file: demo.yml
-    apply:
-      tags: [demo]
-  tags: [demo]
+# --- Cleanup ---
 
 - name: Clean up manifests from remote
   ansible.builtin.file:

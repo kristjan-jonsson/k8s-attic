@@ -52,3 +52,15 @@ keycloak_pg_password: "changeme-pg-keycloak"
 # --- Harbor ---
 harbor_admin_password: "changeme-harbor-admin"
 harbor_storage_size: 10Gi
+
+# ============================================================================
+# Services to deploy
+# Default services (always deployed): ingress, cert-manager, longhorn, coredns
+# Optional services: toggle true/false below
+# ============================================================================
+services:
+  vault: true
+  keycloak: true
+  harbor: true
+  monitoring: true
+  homeassistant: false
