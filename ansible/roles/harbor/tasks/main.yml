@@ -14,7 +14,7 @@
     helm upgrade --install harbor harbor/harbor
     --namespace harbor --create-namespace
     --values /tmp/k8s-manifests/harbor/harbor-values.yaml
-    --wait --timeout 10m
+    --timeout 15m
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
