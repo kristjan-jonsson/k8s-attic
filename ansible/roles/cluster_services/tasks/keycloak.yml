@@ -3,7 +3,7 @@
 
 - name: Create Keycloak namespace
   ansible.builtin.command: >
-    kubectl apply -f {{ playbook_dir }}/../manifests/keycloak/namespace.yaml
+    kubectl apply -f /tmp/k8s-manifests/keycloak/namespace.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
@@ -12,7 +12,7 @@
   ansible.builtin.command: >
     helm upgrade --install keycloak bitnami/keycloak
     --namespace keycloak
-    --values {{ playbook_dir }}/../manifests/keycloak/keycloak-values.yaml
+    --values /tmp/k8s-manifests/keycloak/keycloak-values.yaml
     --wait --timeout 10m
   environment:
     KUBECONFIG: /home/rke/.kube/config
@@ -20,7 +20,7 @@
 
 - name: Apply example realm config
   ansible.builtin.command: >
-    kubectl apply -f {{ playbook_dir }}/../manifests/keycloak/keycloak-realm-example.yaml
+    kubectl apply -f /tmp/k8s-manifests/keycloak/keycloak-realm-example.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"

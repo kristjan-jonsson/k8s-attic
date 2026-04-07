@@ -5,7 +5,7 @@
   ansible.builtin.command: >
     helm upgrade --install cert-manager jetstack/cert-manager
     --namespace cert-manager --create-namespace
-    --values {{ playbook_dir }}/../manifests/cert-manager/cert-manager-values.yaml
+    --values /tmp/k8s-manifests/cert-manager/cert-manager-values.yaml
     --set crds.enabled=true
     --wait --timeout 5m
   environment:
@@ -18,7 +18,7 @@
 
 - name: Apply cluster issuers
   ansible.builtin.command: >
-    kubectl apply -f {{ playbook_dir }}/../manifests/cert-manager/cluster-issuers.yaml
+    kubectl apply -f /tmp/k8s-manifests/cert-manager/cluster-issuers.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"

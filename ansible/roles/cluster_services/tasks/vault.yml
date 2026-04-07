@@ -5,7 +5,7 @@
   ansible.builtin.command: >
     helm upgrade --install vault hashicorp/vault
     --namespace vault --create-namespace
-    --values {{ playbook_dir }}/../manifests/vault/vault-values.yaml
+    --values /tmp/k8s-manifests/vault/vault-values.yaml
     --wait --timeout 5m
   environment:
     KUBECONFIG: /home/rke/.kube/config

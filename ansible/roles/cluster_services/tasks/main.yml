@@ -4,6 +4,12 @@
 # Runs on rke2 server node
 # ============================================================================
 
+- name: Copy manifests to remote node
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../manifests/"
+    dest: /tmp/k8s-manifests/
+    mode: "0644"
+
 - name: Include NGINX Ingress configuration
   ansible.builtin.include_tasks: ingress.yml
 
@@ -21,3 +27,8 @@
 
 - name: Include CoreDNS custom config
   ansible.builtin.include_tasks: coredns.yml
+
+- name: Clean up manifests from remote
+  ansible.builtin.file:
+    path: /tmp/k8s-manifests
+    state: absent

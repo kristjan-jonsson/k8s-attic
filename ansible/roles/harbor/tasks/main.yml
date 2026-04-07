@@ -3,11 +3,17 @@
 # Harbor Container Registry
 # ============================================================================
 
+- name: Copy Harbor manifests to remote node
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../manifests/harbor/"
+    dest: /tmp/k8s-manifests/harbor/
+    mode: "0644"
+
 - name: Install Harbor
   ansible.builtin.command: >
     helm upgrade --install harbor harbor/harbor
     --namespace harbor --create-namespace
-    --values {{ playbook_dir }}/../manifests/harbor/harbor-values.yaml
+    --values /tmp/k8s-manifests/harbor/harbor-values.yaml
     --wait --timeout 10m
   environment:
     KUBECONFIG: /home/rke/.kube/config

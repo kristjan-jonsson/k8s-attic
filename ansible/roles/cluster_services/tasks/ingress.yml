@@ -3,7 +3,7 @@
 
 - name: Apply NGINX Ingress custom configuration
   ansible.builtin.command: >
-    kubectl apply -f {{ playbook_dir }}/../manifests/ingress/nginx-config.yaml
+    kubectl apply -f /tmp/k8s-manifests/ingress/nginx-config.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
