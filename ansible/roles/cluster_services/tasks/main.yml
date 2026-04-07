@@ -2,6 +2,10 @@
 # ============================================================================
 # Deploy all cluster services via Helm
 # Runs on rke2 server node
+#
+# Tags: ansible-playbook site.yml --tags monitoring
+#       ansible-playbook site.yml --tags keycloak
+#       ansible-playbook site.yml --tags vault
 # ============================================================================
 
 - name: Copy manifests to remote node
@@ -9,29 +13,66 @@
     src: "{{ playbook_dir }}/../manifests/"
     dest: /tmp/k8s-manifests/
     mode: "0644"
+  tags: always
 
 - name: Include NGINX Ingress configuration
-  ansible.builtin.include_tasks: ingress.yml
+  ansible.builtin.include_tasks:
+    file: ingress.yml
+    apply:
+      tags: [ingress]
+  tags: [ingress]
 
 - name: Include cert-manager
-  ansible.builtin.include_tasks: cert_manager.yml
+  ansible.builtin.include_tasks:
+    file: cert_manager.yml
+    apply:
+      tags: [cert-manager]
+  tags: [cert-manager]
 
 - name: Include Longhorn storage
-  ansible.builtin.include_tasks: longhorn.yml
+  ansible.builtin.include_tasks:
+    file: longhorn.yml
+    apply:
+      tags: [longhorn]
+  tags: [longhorn]
 
 - name: Include Vault
-  ansible.builtin.include_tasks: vault.yml
+  ansible.builtin.include_tasks:
+    file: vault.yml
+    apply:
+      tags: [vault]
+  tags: [vault]
 
 - name: Include Keycloak
-  ansible.builtin.include_tasks: keycloak.yml
+  ansible.builtin.include_tasks:
+    file: keycloak.yml
+    apply:
+      tags: [keycloak]
+  tags: [keycloak]
 
 - name: Include CoreDNS custom config
-  ansible.builtin.include_tasks: coredns.yml
+  ansible.builtin.include_tasks:
+    file: coredns.yml
+    apply:
+      tags: [coredns]
+  tags: [coredns]
 
 - name: Include monitoring (Prometheus + Grafana)
-  ansible.builtin.include_tasks: monitoring.yml
+  ansible.builtin.include_tasks:
+    file: monitoring.yml
+    apply:
+      tags: [monitoring]
+  tags: [monitoring]
+
+- name: Include demo guestbook app
+  ansible.builtin.include_tasks:
+    file: demo.yml
+    apply:
+      tags: [demo]
+  tags: [demo]
 
 - name: Clean up manifests from remote
   ansible.builtin.file:
     path: /tmp/k8s-manifests
     state: absent
+  tags: always
