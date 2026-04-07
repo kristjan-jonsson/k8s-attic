@@ -24,6 +24,13 @@
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
+- name: Install Python kubernetes library
+  ansible.builtin.pip:
+    name:
+      - kubernetes
+      - PyYAML
+    state: present
+
 - name: Add Helm repositories
   kubernetes.core.helm_repository:
     name: "{{ item.name }}"
