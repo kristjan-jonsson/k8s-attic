@@ -11,8 +11,9 @@
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
-- name: Apply custom storage classes
-  ansible.builtin.command: >
+- name: Apply custom storage classes (delete + create since parameters are immutable)
+  ansible.builtin.shell: |
+    kubectl delete -f /tmp/k8s-manifests/storage/storage-classes.yaml --ignore-not-found
     kubectl apply -f /tmp/k8s-manifests/storage/storage-classes.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
