@@ -22,7 +22,7 @@
     - name: Run Helm installer
       ansible.builtin.command: /tmp/get-helm.sh
       environment:
-        KUBECONFIG: /home/rke/.kube/config
+        PATH: "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 - name: Add Helm repositories
   kubernetes.core.helm_repository:
