@@ -87,11 +87,11 @@
     state: started
     enabled: true
 
-- name: Configure NetworkManager for RKE2 CNI
+- name: Configure NetworkManager for Cilium
   ansible.builtin.copy:
-    dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+    dest: /etc/NetworkManager/conf.d/rke2-cilium.conf
     content: |
       [keyfile]
-      unmanaged-devices=interface-name:cali*;interface-name:flannel*
+      unmanaged-devices=interface-name:cilium*;interface-name:lxc*;interface-name:veth*
     mode: "0644"
   notify: restart networkmanager

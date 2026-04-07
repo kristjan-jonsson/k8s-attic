@@ -7,4 +7,5 @@ tls-san:
   - {{ ansible_host }}
 
 write-kubeconfig-mode: "0644"
-cni: {{ rke2_cni }}
+cni: none
+disable-kube-proxy: true

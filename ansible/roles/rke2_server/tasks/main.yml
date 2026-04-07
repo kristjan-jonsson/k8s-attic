@@ -76,6 +76,80 @@
   ansible.builtin.set_fact:
     rke2_node_token: "{{ rke2_node_token_raw.content | b64decode | trim }}"
 
+# --- Wait for API server to be responsive ---
+- name: Wait for API server
+  ansible.builtin.shell: |
+    /var/lib/rancher/rke2/bin/kubectl \
+      --kubeconfig /etc/rancher/rke2/rke2.yaml \
+      --server https://127.0.0.1:6443 \
+      get ns default
+  retries: 30
+  delay: 10
+  register: api_ready
+  until: api_ready is not failed
+  changed_when: false
+
+# --- Install Cilium CNI ---
+- name: Check if Helm is installed
+  ansible.builtin.command: helm version --short
+  register: helm_check
+  changed_when: false
+  failed_when: false
+  environment:
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Install Helm
+  when: helm_check.rc != 0
+  block:
+    - name: Download Helm installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm.sh
+        mode: "0755"
+
+    - name: Run Helm installer
+      ansible.builtin.command: /tmp/get-helm.sh
+
+- name: Add Cilium Helm repo
+  ansible.builtin.command: helm repo add cilium https://helm.cilium.io/
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+  changed_when: false
+  failed_when: false
+
+- name: Install Cilium
+  ansible.builtin.shell: |
+    export KUBECONFIG=/etc/rancher/rke2/rke2.yaml
+    export PATH=/var/lib/rancher/rke2/bin:$PATH
+
+    # Set server to 127.0.0.1 in kubeconfig for helm
+    kubectl config set-cluster default --server=https://127.0.0.1:6443
+
+    helm upgrade --install cilium cilium/cilium \
+      --namespace kube-system \
+      --set operator.replicas=1 \
+      --set kubeProxyReplacement=true \
+      --set k8sServiceHost=127.0.0.1 \
+      --set k8sServicePort=6443 \
+      --set cni.exclusive=false \
+      --wait --timeout 5m
+  register: cilium_install
+  changed_when: "'has been upgraded' in cilium_install.stdout or 'has been installed' in cilium_install.stdout"
+
+# --- Wait for node to be Ready (now that Cilium is installed) ---
+- name: Wait for node to register and be Ready
+  ansible.builtin.shell: |
+    KC="--kubeconfig /etc/rancher/rke2/rke2.yaml --server https://127.0.0.1:6443"
+    node=$(/var/lib/rancher/rke2/bin/kubectl $KC get nodes -o name 2>/dev/null | head -1)
+    [ -z "$node" ] && exit 1
+    /var/lib/rancher/rke2/bin/kubectl $KC wait --for=condition=Ready "$node" --timeout=30s
+  retries: 20
+  delay: 15
+  register: node_ready
+  until: node_ready is not failed
+  changed_when: false
+
+# --- Set up kubeconfig for rke user and fetch locally ---
 - name: Create .kube directory for rke user
   ansible.builtin.file:
     path: /home/rke/.kube
@@ -93,7 +167,7 @@
     group: rke
     mode: "0600"
 
-- name: Update kubeconfig server address
+- name: Update kubeconfig server address for remote access
   ansible.builtin.replace:
     path: /home/rke/.kube/config
     regexp: '127\.0\.0\.1'
@@ -115,15 +189,3 @@
       source <(kubectl completion bash)
       complete -o default -F __start_kubectl k
     marker: "# {mark} RKE2 PATH"
-
-- name: Wait for node to register and be Ready
-  ansible.builtin.shell: |
-    KC="--kubeconfig /etc/rancher/rke2/rke2.yaml --server https://127.0.0.1:6443"
-    node=$(/var/lib/rancher/rke2/bin/kubectl $KC get nodes -o name 2>/dev/null | head -1)
-    [ -z "$node" ] && exit 1
-    /var/lib/rancher/rke2/bin/kubectl $KC wait --for=condition=Ready "$node" --timeout=30s
-  retries: 20
-  delay: 15
-  register: node_ready
-  until: node_ready is not failed
-  changed_when: false

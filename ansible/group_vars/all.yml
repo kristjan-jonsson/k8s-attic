@@ -12,7 +12,6 @@ ssh_public_key: "ssh-rsa REPLACE_WITH_YOUR_PUBLIC_KEY"
 
 # --- RKE2 ---
 rke2_version: ""  # Leave empty for latest stable
-rke2_cni: canal
 
 # --- VM Provisioning ---
 vm_base_image: /path/to/OL9U4_x86_64-kvm-b234.qcow2
