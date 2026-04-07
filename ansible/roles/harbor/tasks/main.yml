@@ -4,16 +4,14 @@
 # ============================================================================
 
 - name: Install Harbor
-  kubernetes.core.helm:
-    name: harbor
-    chart_ref: harbor/harbor
-    release_namespace: harbor
-    create_namespace: true
-    kubeconfig: /home/rke/.kube/config
-    values_files:
-      - "{{ playbook_dir }}/../manifests/harbor/harbor-values.yaml"
-    wait: true
-    wait_timeout: 600s
+  ansible.builtin.command: >
+    helm upgrade --install harbor harbor/harbor
+    --namespace harbor --create-namespace
+    --values {{ playbook_dir }}/../manifests/harbor/harbor-values.yaml
+    --wait --timeout 10m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Display Harbor info
   ansible.builtin.debug:

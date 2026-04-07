@@ -8,23 +8,18 @@
     mode: "0644"
 
 - name: Apply CoreDNS custom config
-  kubernetes.core.k8s:
-    kubeconfig: /home/rke/.kube/config
-    state: present
-    src: /tmp/coredns-custom.yaml
+  ansible.builtin.command: >
+    kubectl apply -f /tmp/coredns-custom.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Restart CoreDNS to pick up changes
-  kubernetes.core.k8s:
-    kubeconfig: /home/rke/.kube/config
-    kind: Deployment
-    namespace: kube-system
-    name: rke2-coredns-rke2-coredns
-    definition:
-      spec:
-        template:
-          metadata:
-            annotations:
-              kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
+  ansible.builtin.command: >
+    kubectl -n kube-system rollout restart deployment rke2-coredns-rke2-coredns
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
   ignore_errors: true
 
 - name: Clean up temp file

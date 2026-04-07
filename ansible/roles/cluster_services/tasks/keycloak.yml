@@ -2,24 +2,25 @@
 # Keycloak Identity and Access Management
 
 - name: Create Keycloak namespace
-  kubernetes.core.k8s:
-    kubeconfig: /home/rke/.kube/config
-    state: present
-    src: "{{ playbook_dir }}/../manifests/keycloak/namespace.yaml"
+  ansible.builtin.command: >
+    kubectl apply -f {{ playbook_dir }}/../manifests/keycloak/namespace.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Install Keycloak
-  kubernetes.core.helm:
-    name: keycloak
-    chart_ref: bitnami/keycloak
-    release_namespace: keycloak
-    kubeconfig: /home/rke/.kube/config
-    values_files:
-      - "{{ playbook_dir }}/../manifests/keycloak/keycloak-values.yaml"
-    wait: true
-    wait_timeout: 600s
+  ansible.builtin.command: >
+    helm upgrade --install keycloak bitnami/keycloak
+    --namespace keycloak
+    --values {{ playbook_dir }}/../manifests/keycloak/keycloak-values.yaml
+    --wait --timeout 10m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Apply example realm config
-  kubernetes.core.k8s:
-    kubeconfig: /home/rke/.kube/config
-    state: present
-    src: "{{ playbook_dir }}/../manifests/keycloak/keycloak-realm-example.yaml"
+  ansible.builtin.command: >
+    kubectl apply -f {{ playbook_dir }}/../manifests/keycloak/keycloak-realm-example.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
