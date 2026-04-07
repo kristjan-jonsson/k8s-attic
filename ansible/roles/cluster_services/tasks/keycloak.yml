@@ -1,5 +1,6 @@
 ---
 # Keycloak Identity and Access Management
+# Deployed via plain manifests (no Helm chart needed)
 
 - name: Create Keycloak namespace
   ansible.builtin.command: >
@@ -8,15 +9,24 @@
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
-- name: Install Keycloak
+- name: Deploy Keycloak and PostgreSQL
   ansible.builtin.command: >
-    helm upgrade --install keycloak bitnami/keycloak
-    --namespace keycloak
-    --values /tmp/k8s-manifests/keycloak/keycloak-values.yaml
-    --wait --timeout 10m
+    kubectl apply -f /tmp/k8s-manifests/keycloak/keycloak-deploy.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Keycloak to be ready
+  ansible.builtin.shell: |
+    kubectl -n keycloak wait --for=condition=Available deployment/keycloak --timeout=300s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: kc_ready
+  until: kc_ready is not failed
+  changed_when: false
 
 - name: Apply example realm config
   ansible.builtin.command: >
