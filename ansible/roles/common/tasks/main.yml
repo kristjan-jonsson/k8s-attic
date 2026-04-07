@@ -92,6 +92,41 @@
     regexp: '^SELINUX=enforcing'
     line: 'SELINUX=permissive'
 
+# --- Extend LVM to use full disk for Longhorn storage ---
+- name: Install growpart
+  ansible.builtin.dnf:
+    name: cloud-utils-growpart
+    state: present
+
+- name: Grow LVM partition to fill disk
+  ansible.builtin.command: growpart /dev/vda 4
+  register: growpart_result
+  changed_when: "'CHANGED' in growpart_result.stdout"
+  failed_when: false
+
+- name: Resize PV to use expanded partition
+  ansible.builtin.command: pvresize /dev/vda4
+  when: growpart_result.changed
+  changed_when: true
+
+- name: Get root LV path
+  ansible.builtin.shell: |
+    lvs --noheadings -o lv_path -S 'lv_attr=~[^s]wi' | grep -v swap | head -1 | tr -d ' '
+  register: root_lv
+  changed_when: false
+
+- name: Extend root LV to use all free space
+  ansible.builtin.command: "lvextend -l +100%FREE {{ root_lv.stdout }}"
+  when: growpart_result.changed
+  register: lvextend_result
+  changed_when: "'successfully resized' in lvextend_result.stdout"
+  failed_when: false
+
+- name: Grow XFS filesystem
+  ansible.builtin.command: "xfs_growfs {{ root_lv.stdout }}"
+  when: lvextend_result is changed
+  changed_when: true
+
 - name: Enable iscsid for Longhorn
   ansible.builtin.systemd:
     name: iscsid
