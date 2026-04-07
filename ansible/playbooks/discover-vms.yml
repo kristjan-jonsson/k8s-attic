@@ -9,35 +9,28 @@
   gather_facts: false
 
   tasks:
-    - name: Wait for VMs to get DHCP leases
+    - name: Get VM MAC addresses
       ansible.builtin.shell: |
-        # Try virsh domifaddr first (works with libvirt-managed DHCP)
-        ip=$(virsh domifaddr {{ item.name }} 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+')
-        if [ -n "$ip" ]; then echo "$ip"; exit 0; fi
+        virsh domiflist {{ item.name }} 2>/dev/null | awk 'NR>2 && NF {print $5}'
+      register: vm_macs
+      loop: "{{ vms }}"
+      changed_when: false
 
-        # Fallback: get MAC from virsh, look up in ARP table (bridged networking)
-        mac=$(virsh domiflist {{ item.name }} 2>/dev/null | awk '/br/ {print $5}')
-        if [ -z "$mac" ]; then exit 1; fi
+    - name: Wait for VMs to get DHCP leases (MAC → ARP lookup)
+      ansible.builtin.shell: |
+        mac="{{ (vm_macs.results[idx].stdout | trim) }}"
+        [ -z "$mac" ] && exit 1
 
-        # Ping broadcast to populate ARP table
-        bridge=$(virsh domiflist {{ item.name }} 2>/dev/null | awk '/br/ {print $3}')
-        subnet=$(ip -4 addr show "$bridge" 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)
-        if [ -n "$subnet" ]; then ping -b -c 2 -w 1 "${subnet}.255" >/dev/null 2>&1 || true; fi
+        # Ping the bridge subnet broadcast to populate ARP table
+        bcast=$(ip -4 addr show {{ vm_bridge }} | grep -oP 'brd \K[\d.]+')
+        ping -b -c 3 -w 2 "$bcast" >/dev/null 2>&1 || true
 
-        ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\d+\.\d+\.\d+\.\d+')
-        if [ -n "$ip" ]; then echo "$ip"; exit 0; fi
-
-        # Fallback: check dhcpd leases file if available
-        for f in /var/lib/dhcpd/dhcpd.leases /var/lib/dhcp/dhcpd.leases; do
-          if [ -f "$f" ]; then
-            ip=$(grep -B5 -i "$mac" "$f" 2>/dev/null | grep 'lease ' | tail -1 | awk '{print $2}')
-            if [ -n "$ip" ]; then echo "$ip"; exit 0; fi
-          fi
-        done
-
-        exit 1
+        ip=$(arp -an 2>/dev/null | grep -i "$mac" | grep -oP '\d+\.\d+\.\d+\.\d+' | head -1)
+        [ -n "$ip" ] && echo "$ip" || exit 1
       register: vm_ips
       loop: "{{ vms }}"
+      loop_control:
+        index_var: idx
       retries: 30
       delay: 10
       until: vm_ips is not failed
