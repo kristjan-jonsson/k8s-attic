@@ -31,7 +31,7 @@ persistence:
   persistentVolumeClaim:
     registry:
       storageClass: longhorn
-      size: 50Gi
+      size: 10Gi
     database:
       storageClass: longhorn-db
       size: 5Gi
