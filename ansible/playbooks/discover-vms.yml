@@ -1,11 +1,11 @@
 ---
 # ============================================================================
-# Discover DHCP-assigned VM IPs from the hypervisor and register them
-# as in-memory inventory hosts. Include this in any playbook that needs
-# to target the cluster nodes.
+# Discover DHCP-assigned VM IPs via virsh on localhost (KVM host)
+# and register them as in-memory inventory hosts.
 # ============================================================================
-- name: Discover VM IPs from hypervisor
-  hosts: hypervisor
+- name: Discover VM IPs from localhost
+  hosts: localhost
+  connection: local
   gather_facts: false
 
   tasks:
@@ -45,6 +45,7 @@
       ansible.builtin.add_host:
         name: "{{ item.name }}"
         ansible_host: "{{ item.ip }}"
+        ansible_user: rke
         groups:
           - rke2_servers
           - rke2_cluster
@@ -56,6 +57,7 @@
       ansible.builtin.add_host:
         name: "{{ item.name }}"
         ansible_host: "{{ item.ip }}"
+        ansible_user: rke
         groups:
           - rke2_agents
           - rke2_cluster

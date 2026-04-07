@@ -1,22 +1,13 @@
 all:
   children:
-    # KVM hypervisor host (for VM provisioning and teardown)
-    hypervisor:
-      hosts:
-        kvm-host:
-          ansible_host: 192.168.1.1    # Update with KVM host IP
-          ansible_user: your-user      # Update with your KVM host username
-          ansible_become_password: "{{ kvm_become_password }}"
-
     # BIND DNS server (for *.haaloft.local registration)
     dns_servers:
       hosts:
         dns-01:
           ansible_host: 192.168.1.2    # Update with DNS server IP
 
-    # These groups are populated dynamically by provision-vms.yml / site.yml
-    # after discovering DHCP-assigned IPs from the hypervisor.
-    # You can also hardcode IPs here if you prefer static inventory.
+    # These groups are populated dynamically by discover-vms.yml
+    # after discovering DHCP-assigned IPs via virsh on localhost.
     rke2_servers:
       hosts: {}
     rke2_agents:

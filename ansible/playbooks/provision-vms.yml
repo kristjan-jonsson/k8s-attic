@@ -1,10 +1,12 @@
 ---
 # ============================================================================
 # Provision KVM virtual machines for the RKE2 cluster
-# Run: ansible-playbook playbooks/provision-vms.yml
+# Run on the KVM host: ansible-playbook playbooks/provision-vms.yml -K
 # ============================================================================
-- name: Provision VMs on KVM hypervisor
-  hosts: hypervisor
+- name: Provision VMs on localhost (KVM host)
+  hosts: localhost
+  connection: local
+  become: true
   gather_facts: true
 
   tasks:

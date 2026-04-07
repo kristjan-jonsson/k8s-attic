@@ -74,26 +74,24 @@ Edit [ansible/group_vars/all.yml](ansible/group_vars/all.yml):
 ```bash
 cd ansible
 
-# Create VMs (prompts for KVM host sudo password)
-ansible-playbook playbooks/provision-vms.yml --ask-become-pass
+# Create VMs on this host (use -K if your user needs sudo password)
+ansible-playbook playbooks/provision-vms.yml -K
 
-# Deploy K8S + all services (discovers VM IPs from hypervisor automatically)
-ansible-playbook site.yml --ask-become-pass
+# Deploy K8S + all services (SSHes into VMs as rke user)
+ansible-playbook site.yml
 ```
 
-VM IPs are discovered automatically via `virsh domifaddr` on the hypervisor - no manual IP entry needed. The playbooks poll until DHCP leases are assigned.
-
-The `--ask-become-pass` (`-K`) flag prompts for the KVM host sudo password. Cluster VMs use passwordless sudo via cloud-init so the prompt only applies to the KVM host.
+Provisioning and teardown run locally on the KVM host (`connection: local`). VM IPs are discovered automatically via `virsh domifaddr`. The `-K` flag prompts for your sudo password on the KVM host. The `site.yml` playbook SSHes into the VMs as the `rke` user (created by cloud-init with passwordless sudo).
 
 ### 3. Teardown and rebuild
 
 ```bash
 # Destroy everything (VMs, disks, DNS records, local kubeconfig, vault creds)
-ansible-playbook playbooks/teardown.yml --ask-become-pass
+ansible-playbook playbooks/teardown.yml -K
 
 # Rebuild from scratch
-ansible-playbook playbooks/provision-vms.yml --ask-become-pass
-ansible-playbook site.yml --ask-become-pass
+ansible-playbook playbooks/provision-vms.yml -K
+ansible-playbook site.yml
 ```
 
 The teardown playbook asks for confirmation before destroying anything.
@@ -315,8 +313,7 @@ k8s-haaloft/
 Before deploying, update these in [ansible/group_vars/all.yml](ansible/group_vars/all.yml):
 
 - [ ] `ssh_public_key` - Your SSH public key
-- [ ] `vm_base_image` - Path to OL9 qcow2 image on KVM host
-- [ ] KVM host IP in `inventory.yml`
+- [ ] `vm_base_image` - Path to OL9 qcow2 image on this host
 - [ ] DNS server IP in `inventory.yml` and `dns_server_ip` in `group_vars/all.yml`
 - [ ] `acme_email` - Your email for Let's Encrypt (if using)
 - [ ] `keycloak_admin_password` / `keycloak_pg_password`

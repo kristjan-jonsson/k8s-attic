@@ -18,7 +18,7 @@
   become: true
   tags: [dns]
   vars:
-    discovered_vms: "{{ hostvars[groups['hypervisor'][0]]['discovered_vms'] }}"
+    discovered_vms: "{{ hostvars['localhost']['discovered_vms'] }}"
   roles:
     - dns
 

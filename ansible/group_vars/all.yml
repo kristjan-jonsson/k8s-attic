@@ -10,10 +10,6 @@ cluster_name: haaloft
 ansible_user: rke                # SSH user for cluster VMs (passwordless sudo via cloud-init)
 ssh_public_key: "ssh-rsa REPLACE_WITH_YOUR_PUBLIC_KEY"
 
-# KVM host sudo password - prompted at runtime via --ask-become-pass
-# or set here (not recommended for version control)
-# kvm_become_password: ""
-
 # --- RKE2 ---
 rke2_version: ""  # Leave empty for latest stable
 rke2_cni: canal

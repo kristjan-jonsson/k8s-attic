@@ -1,21 +1,18 @@
 ---
 # ============================================================================
 # Teardown - Destroy everything and clean up
-# Run: ansible-playbook playbooks/teardown.yml
+# Run on the KVM host: ansible-playbook playbooks/teardown.yml -K
 #
 # This will:
 #   1. Remove DNS records from BIND
-#   2. Destroy and undefine all VMs on the hypervisor
+#   2. Destroy and undefine all VMs on localhost
 #   3. Delete VM disk images and cloud-init ISOs
 #   4. Remove local kubeconfig and vault credentials
-#
-# After teardown, you can re-provision from scratch:
-#   ansible-playbook playbooks/provision-vms.yml
-#   ansible-playbook site.yml
 # ============================================================================
 
 - name: Confirm teardown
   hosts: localhost
+  connection: local
   gather_facts: false
   tasks:
     - name: Prompt for confirmation
@@ -43,8 +40,10 @@
         name: dns
         tasks_from: cleanup
 
-- name: Teardown VMs on hypervisor
-  hosts: hypervisor
+- name: Teardown VMs on localhost
+  hosts: localhost
+  connection: local
+  become: true
   gather_facts: false
   tasks:
     - name: Destroy and remove each VM
@@ -57,14 +56,12 @@
       ansible.builtin.file:
         path: "{{ playbook_dir }}/../../kubeconfig"
         state: absent
-      delegate_to: localhost
       become: false
 
     - name: Remove local vault credentials
       ansible.builtin.file:
         path: "{{ playbook_dir }}/../../.vault-credentials"
         state: absent
-      delegate_to: localhost
       become: false
 
     - name: Teardown complete
@@ -76,5 +73,5 @@
           All VMs, disks, and DNS records have been removed.
 
           To rebuild:
-            ansible-playbook playbooks/provision-vms.yml
+            ansible-playbook playbooks/provision-vms.yml -K
             ansible-playbook site.yml
