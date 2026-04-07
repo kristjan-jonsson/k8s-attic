@@ -91,11 +91,11 @@ spec:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.2
           args:
-            - start
-            - --hostname-strict=false
-            - --http-enabled=true
+            - start-dev
+            - --http-port=8080
             - --proxy-headers=xforwarded
             - --health-enabled=true
+            - --hostname-strict=false
           ports:
             - name: http
               containerPort: 8080
