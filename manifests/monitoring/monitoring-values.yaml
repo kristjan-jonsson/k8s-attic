@@ -24,6 +24,18 @@ prometheus:
     scrapeInterval: 30s
     evaluationInterval: 30s
 
+    # Additional scrape targets
+    additionalScrapeConfigs:
+      - job_name: homeassistant
+        scrape_interval: 60s
+        metrics_path: /api/prometheus
+        authorization:
+          credentials: REPLACE_WITH_HA_LONG_LIVED_TOKEN
+        static_configs:
+          - targets: ["homeassistant.homeassistant.svc.cluster.local:80"]
+            labels:
+              source: homeassistant
+
     # Resource limits
     resources:
       requests:
