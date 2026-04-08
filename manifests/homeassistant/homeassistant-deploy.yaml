@@ -40,6 +40,7 @@ data:
       trusted_proxies:
         - 10.42.0.0/16
         - 10.43.0.0/16
+        - 192.168.0.0/24
         - 127.0.0.1
     EOF
     elif ! grep -q "trusted_proxies" "$CONFIG"; then
@@ -50,6 +51,7 @@ data:
       trusted_proxies:
         - 10.42.0.0/16
         - 10.43.0.0/16
+        - 192.168.0.0/24
         - 127.0.0.1
     EOF
     fi
