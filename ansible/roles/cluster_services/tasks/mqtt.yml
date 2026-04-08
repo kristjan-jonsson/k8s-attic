@@ -1,0 +1,17 @@
+---
+# Mosquitto MQTT Broker
+
+- name: Deploy Mosquitto MQTT broker
+  ansible.builtin.command: >
+    kubectl apply -f /tmp/k8s-manifests/mqtt/mosquitto-deploy.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Mosquitto to be ready
+  ansible.builtin.shell: |
+    kubectl -n mqtt wait --for=condition=Available deployment/mosquitto --timeout=120s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  changed_when: false

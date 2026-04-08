@@ -59,7 +59,7 @@
 - name: Deploy cluster services
   hosts: rke2_servers
   become: true
-  tags: [services, ingress, cert-manager, longhorn, vault, keycloak, coredns, monitoring, homeassistant, demo]
+  tags: [services, ingress, cert-manager, longhorn, vault, keycloak, coredns, monitoring, homeassistant, mqtt, zigbee, demo]
   roles:
     - cluster_services
 

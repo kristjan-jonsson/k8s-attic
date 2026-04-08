@@ -81,6 +81,22 @@
   tags: [homeassistant]
   when: services.homeassistant | default(false)
 
+- name: Include MQTT broker (Mosquitto)
+  ansible.builtin.include_tasks:
+    file: mqtt.yml
+    apply:
+      tags: [mqtt, zigbee]
+  tags: [mqtt, zigbee]
+  when: services.mqtt | default(false)
+
+- name: Include Zigbee2MQTT
+  ansible.builtin.include_tasks:
+    file: zigbee2mqtt.yml
+    apply:
+      tags: [zigbee]
+  tags: [zigbee]
+  when: services.zigbee2mqtt | default(false)
+
 # --- Cleanup ---
 
 - name: Clean up manifests from remote

@@ -1,0 +1,36 @@
+---
+# Zigbee2MQTT - Zigbee to MQTT bridge via SLZB-06M
+
+- name: Deploy Zigbee2MQTT
+  ansible.builtin.command: >
+    kubectl apply -f /tmp/k8s-manifests/zigbee2mqtt/zigbee2mqtt-deploy.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Zigbee2MQTT to be ready
+  ansible.builtin.shell: |
+    kubectl -n zigbee2mqtt wait --for=condition=Available deployment/zigbee2mqtt --timeout=180s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: z2m_ready
+  until: z2m_ready is not failed
+  changed_when: false
+
+- name: Display Zigbee2MQTT info
+  ansible.builtin.debug:
+    msg: |
+      IoT stack deployed!
+      MQTT Broker:  mosquitto.mqtt.svc.cluster.local:1883 (internal)
+      Zigbee2MQTT:  https://zigbee.{{ domain }}
+      Coordinator:  SLZB-06M at 192.168.0.176:6638 (TCP)
+
+      Next steps:
+        1. Open Zigbee2MQTT UI and verify coordinator connection
+        2. Enable permit_join to pair sensors
+        3. In Home Assistant: Settings → Integrations → Add MQTT
+           Broker: mosquitto.mqtt.svc.cluster.local
+           Port: 1883

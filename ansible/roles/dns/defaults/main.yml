@@ -22,3 +22,4 @@ dns_service_hosts:
   - longhorn    # Longhorn UI
   - grafana     # Grafana
   - home        # Home Assistant
+  - zigbee      # Zigbee2MQTT
