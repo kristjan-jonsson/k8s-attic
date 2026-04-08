@@ -26,16 +26,15 @@
 
 - name: Check if Vault is initialized
   ansible.builtin.shell: |
-    kubectl -n vault exec vault-0 -- vault status -format=json 2>/dev/null
+    kubectl -n vault exec vault-0 -- vault status -format=json 2>/dev/null || true
   register: vault_status
-  failed_when: false
   changed_when: false
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
 
 - name: Initialize Vault
-  when: vault_status.rc != 0 or (vault_status.stdout | from_json).initialized == false
+  when: vault_status.stdout == '' or (vault_status.stdout | from_json).initialized == false
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
