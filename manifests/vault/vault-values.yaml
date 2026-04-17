@@ -45,7 +45,7 @@ server:
         hosts:
           - vault.haaloft.local
     annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
 
 # Enable the Vault UI
 ui:
