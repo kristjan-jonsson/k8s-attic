@@ -1,0 +1,30 @@
+---
+# ============================================================================
+# Optional /etc/hosts fallback for when ingress-dns doesn't route correctly
+# for the chosen minikube driver. Disabled by default (hosts_file_fallback).
+# ============================================================================
+
+- name: Read minikube IP
+  ansible.builtin.command: minikube ip -p {{ minikube_profile }}
+  become: false
+  register: minikube_ip_result
+  changed_when: false
+  when: hosts_file_state | default('present') == 'present'
+
+- name: Set minikube_ip fact
+  ansible.builtin.set_fact:
+    minikube_ip: "{{ minikube_ip_result.stdout }}"
+  when: hosts_file_state | default('present') == 'present'
+
+- name: Manage static /etc/hosts entries for {{ domain }} services
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - haaloft minikube"
+    state: "{{ hosts_file_state | default('present') }}"
+    block: |
+      {{ minikube_ip | default('0.0.0.0') }} registry.{{ domain }}
+      {{ minikube_ip | default('0.0.0.0') }} auth.{{ domain }}
+      {{ minikube_ip | default('0.0.0.0') }} vault.{{ domain }}
+      {{ minikube_ip | default('0.0.0.0') }} grafana.{{ domain }}
+      {{ minikube_ip | default('0.0.0.0') }} myapp.{{ domain }}
+  become: true

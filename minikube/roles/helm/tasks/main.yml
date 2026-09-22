@@ -1,0 +1,41 @@
+---
+# ============================================================================
+# Install Helm (if missing) and add required repos
+# ============================================================================
+
+- name: Check if Helm is installed
+  ansible.builtin.command: helm version --short
+  become: false
+  register: helm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Helm
+  become: false
+  when: helm_check.rc != 0
+  block:
+    - name: Download Helm installer
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get-helm.sh
+        mode: "0755"
+
+    - name: Run Helm installer
+      ansible.builtin.command: /tmp/get-helm.sh
+
+- name: Add Helm repositories
+  ansible.builtin.command: "helm repo add {{ item.name }} {{ item.url }}"
+  become: false
+  loop:
+    - { name: jetstack, url: "https://charts.jetstack.io" }
+    - { name: hashicorp, url: "https://helm.releases.hashicorp.com" }
+    - { name: bitnami, url: "https://charts.bitnami.com/bitnami" }
+    - { name: harbor, url: "https://helm.goharbor.io" }
+    - { name: prometheus-community, url: "https://prometheus-community.github.io/helm-charts" }
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  become: false
+  changed_when: false

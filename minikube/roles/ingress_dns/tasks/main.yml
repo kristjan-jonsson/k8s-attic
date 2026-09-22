@@ -1,0 +1,47 @@
+---
+# ============================================================================
+# DNS for *.{{ domain }} via minikube's ingress-dns addon
+# Replaces ansible/'s dedicated BIND server + CoreDNS forward zone.
+#
+# ingress-dns resolves the hostname of ANY Ingress resource in the cluster
+# automatically - no static hostname list to maintain.
+# ============================================================================
+
+- name: Enable ingress-dns addon
+  ansible.builtin.command: minikube addons enable ingress-dns -p {{ minikube_profile }}
+  become: false
+  changed_when: false
+
+- name: Read minikube IP
+  ansible.builtin.command: minikube ip -p {{ minikube_profile }}
+  become: false
+  register: minikube_ip_result
+  changed_when: false
+
+- name: Set minikube_ip fact
+  ansible.builtin.set_fact:
+    minikube_ip: "{{ minikube_ip_result.stdout }}"
+
+- name: Ensure /etc/resolver directory exists
+  ansible.builtin.file:
+    path: /etc/resolver
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Point {{ domain }} resolver at minikube
+  ansible.builtin.copy:
+    dest: "/etc/resolver/{{ domain }}"
+    content: |
+      nameserver {{ minikube_ip }}
+    mode: "0644"
+  become: true
+
+- name: Note about minikube tunnel
+  ansible.builtin.debug:
+    msg: >
+      DNS for *.{{ domain }} now points at {{ minikube_ip }} (minikube's ingress-dns addon).
+      If you're using the docker or podman driver, that IP is usually only reachable while
+      `minikube tunnel -p {{ minikube_profile }}` is running in a separate terminal - start
+      it there before testing ingress hostnames. If DNS still doesn't resolve for your driver,
+      set hosts_file_fallback: true in group_vars/all.yml and re-run with --tags dns.

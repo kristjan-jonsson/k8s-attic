@@ -1,0 +1,14 @@
+---
+# NGINX Ingress Controller (minikube's built-in ingress addon)
+# The addon is enabled by roles/minikube_cluster - this just verifies it
+# and applies a smoke-test Ingress.
+
+- name: Verify ingress addon is enabled
+  ansible.builtin.command: minikube addons enable ingress -p {{ minikube_profile }}
+  become: false
+  changed_when: false
+
+- name: Apply example Ingress (smoke test)
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/ingress/example-ingress.yaml --context {{ minikube_profile }}
+  become: false

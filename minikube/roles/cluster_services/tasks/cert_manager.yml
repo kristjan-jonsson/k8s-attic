@@ -1,0 +1,21 @@
+---
+# cert-manager installation and configuration
+
+- name: Install cert-manager
+  ansible.builtin.command: >
+    helm upgrade --install cert-manager jetstack/cert-manager
+    --namespace cert-manager --create-namespace
+    --kube-context {{ minikube_profile }}
+    --values {{ manifests_dir }}/cert-manager/cert-manager-values.yaml
+    --set crds.enabled=true
+    --wait --timeout 5m
+  become: false
+
+- name: Wait for cert-manager webhook
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Apply cluster issuers
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/cert-manager/cluster-issuers.yaml --context {{ minikube_profile }}
+  become: false

@@ -1,0 +1,5 @@
+.vault-credentials
+.haaloft-ca.crt
+.containerd-hosts.toml
+kubeconfig
+*.retry
