@@ -1,0 +1,120 @@
+# ============================================================================
+# Harbor Container Registry
+# Install: helm install harbor harbor/harbor -n harbor --create-namespace -f harbor-values.yaml
+# ============================================================================
+
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      secretName: harbor-tls
+  ingress:
+    hosts:
+      core: registry.haaloft.local
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"       # No limit for image pushes
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+
+# Note: matches the kind cluster's mapped ingress https port (see
+# group_vars/all.yml: ingress_https_port) - Harbor uses this for redirects
+# and registry v2 API responses, so it must match what clients actually use.
+externalURL: https://registry.haaloft.local:9443
+
+# Admin password
+harborAdminPassword: changeme-harbor-admin
+
+# Persistent storage using kind's built-in local-path-provisioner
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    registry:
+      storageClass: standard
+      size: 10Gi
+    database:
+      storageClass: standard
+      size: 5Gi
+    trivy:
+      storageClass: standard
+      size: 5Gi
+
+# Database (PostgreSQL)
+database:
+  type: internal
+  internal:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+# Redis - external, not the chart's bundled internal one (see
+# harbor-redis-external.yaml for why: no arm64 image, segfaults under QEMU
+# emulation on Apple Silicon).
+redis:
+  type: external
+  external:
+    addr: "harbor-redis-external:6379"
+    coreDatabaseIndex: "0"
+    jobserviceDatabaseIndex: "1"
+    registryDatabaseIndex: "2"
+    trivyAdapterIndex: "5"
+    username: ""
+    password: ""
+
+# Core service
+core:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Registry
+registry:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Trivy vulnerability scanner
+trivy:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# Job service
+jobservice:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+# Portal (web UI)
+portal:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# Enable metrics for monitoring
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false  # Enable if monitoring is deployed

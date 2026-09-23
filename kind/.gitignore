@@ -1,0 +1,9 @@
+.env
+.vault-credentials
+.haaloft-ca.crt
+.containerd-hosts.toml
+.containerd-registry-config-path.toml
+.corporate-ca-*.crt
+.keycloak-deploy.yaml
+kubeconfig
+*.retry

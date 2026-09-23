@@ -1,0 +1,48 @@
+---
+# NGINX Ingress Controller, installed via the kind-flavored upstream manifest
+# (vendored under manifests/ingress/ - uses hostPort 80/443 + the
+# ingress-ready=true node label, matching the kind cluster's port mappings).
+
+- name: Remove any stale/broken ingress controller install (e.g. Contour)
+  ansible.builtin.command: >
+    kubectl delete namespace projectcontour --ignore-not-found --context {{ kube_context }}
+  become: false
+  changed_when: false
+
+- name: Install ingress-nginx
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/ingress/ingress-nginx-kind-deploy.yaml --context {{ kube_context }}
+  become: false
+
+- name: Wait for the ingress-nginx controller to be ready
+  ansible.builtin.command: >
+    kubectl wait --namespace ingress-nginx
+    --for=condition=ready pod
+    --selector=app.kubernetes.io/component=controller
+    --timeout=180s --context {{ kube_context }}
+  become: false
+  changed_when: false
+
+- name: Wait for the admission webhook endpoint to register
+  # The controller pod can report Ready slightly before its admission webhook
+  # endpoint is registered, causing the very next apply to fail with
+  # "dial tcp ...: connect: connection refused" - retry past that window.
+  ansible.builtin.command: >
+    kubectl -n ingress-nginx get endpoints ingress-nginx-controller-admission
+    -o jsonpath={.subsets[0].addresses[0].ip} --context {{ kube_context }}
+  become: false
+  register: admission_endpoint
+  retries: 12
+  delay: 5
+  until: admission_endpoint.stdout != ''
+  changed_when: false
+
+- name: Apply example Ingress (smoke test)
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/ingress/example-ingress.yaml --context {{ kube_context }}
+  become: false
+  register: apply_example_ingress
+  retries: 6
+  delay: 5
+  until: apply_example_ingress is not failed
+  changed_when: true

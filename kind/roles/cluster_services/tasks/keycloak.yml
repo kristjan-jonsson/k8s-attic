@@ -1,0 +1,38 @@
+---
+# Keycloak Identity and Access Management
+# Deployed via plain manifests (no Helm chart needed)
+
+- name: Create Keycloak namespace
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/keycloak/namespace.yaml --context {{ kube_context }}
+  become: false
+
+- name: Render Keycloak manifest locally
+  # Templated (unlike the other plain-copy manifests) because
+  # --hostname-port must match group_vars/all.yml: ingress_https_port -
+  # see the comment in the template for why that can't be left implicit.
+  ansible.builtin.template:
+    src: keycloak-deploy.yaml.j2
+    dest: "{{ playbook_dir }}/.keycloak-deploy.yaml"
+    mode: "0644"
+  become: false
+
+- name: Deploy Keycloak and PostgreSQL
+  ansible.builtin.command: >
+    kubectl apply -f {{ playbook_dir }}/.keycloak-deploy.yaml --context {{ kube_context }}
+  become: false
+
+- name: Wait for Keycloak to be ready
+  ansible.builtin.shell: |
+    kubectl -n keycloak --context {{ kube_context }} wait --for=condition=Available deployment/keycloak --timeout=300s
+  become: false
+  retries: 3
+  delay: 30
+  register: kc_ready
+  until: kc_ready is not failed
+  changed_when: false
+
+- name: Apply example realm config
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/keycloak/keycloak-realm-example.yaml --context {{ kube_context }}
+  become: false

@@ -1,0 +1,130 @@
+---
+# ============================================================================
+# Teardown - Uninstall everything this automation deployed onto the kind
+# cluster, and clean up local state. Does NOT delete the kind cluster
+# itself - it doesn't own the cluster's lifecycle (see README.md); run
+# `kind delete cluster --name {{ kind_cluster_name }}` yourself if you want
+# that too.
+# Run from kind/: ansible-playbook playbooks/teardown.yml
+#
+# This will:
+#   1. Uninstall the Helm releases and namespaces this automation created
+#   2. Remove the /etc/hosts entries for *.{{ domain }}
+#   3. Remove local vault credentials and CA/containerd scratch files
+# ============================================================================
+
+- name: Confirm teardown
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Prompt for confirmation
+      ansible.builtin.pause:
+        prompt: |
+          WARNING: This will uninstall all Haaloft services from context '{{ kube_context }}'
+          (ingress-nginx, cert-manager, vault, keycloak, monitoring, harbor and their data).
+          The kind cluster itself is left running.
+
+          Type 'yes' to continue
+      register: confirm
+
+    - name: Abort if not confirmed
+      ansible.builtin.fail:
+        msg: "Teardown aborted."
+      when: confirm.user_input != 'yes'
+
+- name: Uninstall services
+  hosts: localhost
+  gather_facts: true
+  tasks:
+    - name: Uninstall Helm releases
+      ansible.builtin.command: >
+        helm uninstall {{ item.release }} --namespace {{ item.namespace }} --kube-context {{ kube_context }}
+      loop:
+        - { release: harbor, namespace: harbor }
+        - { release: monitoring, namespace: monitoring }
+        - { release: vault, namespace: vault }
+        - { release: cert-manager, namespace: cert-manager }
+      become: false
+      failed_when: false
+      changed_when: true
+
+    - name: Delete plain-manifest namespaces
+      ansible.builtin.command: >
+        kubectl delete namespace {{ item }} --ignore-not-found --context {{ kube_context }}
+      loop:
+        - keycloak
+        - harbor
+        - monitoring
+        - vault
+        - cert-manager
+        - homeassistant
+        - mqtt
+        - zigbee2mqtt
+      become: false
+      changed_when: true
+
+    - name: Delete ingress-nginx
+      ansible.builtin.command: >
+        kubectl delete namespace ingress-nginx --ignore-not-found --context {{ kube_context }}
+      become: false
+      changed_when: true
+
+- name: Remove DNS entries
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: hosts_dns
+      vars:
+        hosts_dns_state: absent
+
+- name: Clean up local state
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Remove local vault credentials
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../.vault-credentials"
+        state: absent
+      become: false
+
+    - name: Remove local CA/containerd scratch files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ playbook_dir }}/../.haaloft-ca.crt"
+        - "{{ playbook_dir }}/../.containerd-hosts.toml"
+        - "{{ playbook_dir }}/../.containerd-registry-config-path.toml"
+        - "{{ playbook_dir }}/../.keycloak-deploy.yaml"
+      become: false
+
+    - name: Find local corporate CA scratch files
+      ansible.builtin.find:
+        paths: "{{ playbook_dir }}/.."
+        patterns: ".corporate-ca-*.crt"
+        hidden: true
+      become: false
+      register: corp_ca_files
+
+    - name: Remove local corporate CA scratch files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ corp_ca_files.files }}"
+      become: false
+
+    - name: Teardown complete
+      ansible.builtin.debug:
+        msg: |
+          =============================================
+            Teardown Complete
+          =============================================
+          All services and DNS entries have been removed. The kind cluster
+          itself is still running.
+
+          To rebuild:
+            ansible-playbook site.yml
+
+          To also remove the kind cluster:
+            kind delete cluster --name {{ kind_cluster_name }}

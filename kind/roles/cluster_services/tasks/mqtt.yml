@@ -1,0 +1,13 @@
+---
+# Mosquitto MQTT Broker
+
+- name: Deploy Mosquitto MQTT broker
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/mqtt/mosquitto-deploy.yaml --context {{ kube_context }}
+  become: false
+
+- name: Wait for Mosquitto to be ready
+  ansible.builtin.shell: |
+    kubectl -n mqtt --context {{ kube_context }} wait --for=condition=Available deployment/mosquitto --timeout=120s
+  become: false
+  changed_when: false

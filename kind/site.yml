@@ -1,0 +1,80 @@
+---
+# ============================================================================
+# Haaloft K8S Cluster - kind (local dev) version - Master Playbook
+#
+# Assumes a kind cluster already exists (created outside Ansible - see
+# README.md). This automation only deploys services onto it.
+#
+# Full deploy:              ansible-playbook site.yml
+# Just services:             ansible-playbook site.yml --tags "services"
+# Just one service:          ansible-playbook site.yml --tags "monitoring"
+# Teardown services:         ansible-playbook playbooks/teardown.yml
+# ============================================================================
+
+# --- Stage 1: Verify the kind cluster is reachable ---
+- name: Preflight
+  hosts: localhost
+  tags: [always]
+  roles:
+    - preflight
+
+# --- Stage 2: DNS for *.{{ domain }} via static /etc/hosts entries ---
+- name: Configure DNS
+  hosts: localhost
+  tags: [dns]
+  roles:
+    - hosts_dns
+
+# --- Stage 3: Install Helm ---
+- name: Install Helm
+  hosts: localhost
+  tags: [helm, services]
+  roles:
+    - helm
+
+# --- Stage 4: Deploy cluster services ---
+- name: Deploy cluster services
+  hosts: localhost
+  tags: [services, ingress, cert-manager, vault, keycloak, monitoring, homeassistant, mqtt, zigbee]
+  roles:
+    - cluster_services
+
+# --- Stage 5: Deploy Harbor container registry ---
+- name: Deploy Harbor registry
+  hosts: localhost
+  tags: [services, harbor]
+  roles:
+    - role: harbor
+      when: services.harbor | default(false)
+
+# --- Final: Display summary ---
+- name: Deployment summary
+  hosts: localhost
+  tags: [always]
+  tasks:
+    - name: Show cluster info
+      ansible.builtin.debug:
+        msg: |
+          =============================================
+            Haaloft K8S Cluster (kind) Deployed!
+          =============================================
+
+          kubectl context: {{ kube_context }}
+            kubectl config use-context {{ kube_context }}
+
+          Services (all reached via non-standard ingress ports - see below):
+            Ingress:      NGINX (kind-flavored ingress-nginx)
+            Certificates: cert-manager ({{ cert_issuer }})
+            Secrets:      https://{{ vault_host }}:{{ ingress_https_port }}
+            Auth:         https://{{ keycloak_host }}:{{ ingress_https_port }}
+            Registry:     https://{{ harbor_host }}:{{ ingress_https_port }}
+            Monitoring:   https://{{ grafana_host }}:{{ ingress_https_port }}
+
+          DNS: *.{{ domain }} resolves to 127.0.0.1 via /etc/hosts, forwarded by podman to
+          the kind node's ingress on host ports {{ ingress_http_port }} (http) /
+          {{ ingress_https_port }} (https).
+
+          Push images:
+            docker login {{ harbor_host }}:{{ ingress_https_port }}
+            docker tag myapp:latest {{ harbor_host }}:{{ ingress_https_port }}/library/myapp:latest
+            docker push {{ harbor_host }}:{{ ingress_https_port }}/library/myapp:latest

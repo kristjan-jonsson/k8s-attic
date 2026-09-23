@@ -1,0 +1,5 @@
+---
+- name: restart containerd in kind node
+  ansible.builtin.command: >
+    {{ kind_container_engine }} exec {{ kind_node_container }} systemctl restart containerd
+  become: false

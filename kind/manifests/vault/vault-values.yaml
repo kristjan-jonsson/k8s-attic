@@ -1,0 +1,70 @@
+# ============================================================================
+# HashiCorp Vault - Secret Management
+# Install: helm install vault hashicorp/vault -n vault --create-namespace -f vault-values.yaml
+# ============================================================================
+
+server:
+  # Single-node mode for local dev (no HA/raft needed)
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }
+
+  # Persistent storage for Vault data (kind's built-in local-path-provisioner)
+  dataStorage:
+    enabled: true
+    size: 2Gi
+    storageClass: standard
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # The chart's default pod anti-affinity assumes multiple nodes to spread
+  # replicas across - on a single-node kind cluster it deadlocks any rolling
+  # update (the new pod can never schedule while the old one is still up).
+  # Empty string disables it, per the chart's own values.yaml comment.
+  affinity: ""
+
+  # Ingress for Vault UI
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - host: vault.haaloft.local
+    tls:
+      - secretName: vault-tls
+        hosts:
+          - vault.haaloft.local
+    annotations:
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
+
+# Enable the Vault UI
+ui:
+  enabled: true
+
+# Vault Agent Injector - automatically injects secrets into pods
+injector:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  # See server.affinity above - same single-node deadlock applies here.
+  affinity: ""

@@ -1,0 +1,223 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hnitapp
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hnitapp-secrets
+  namespace: hnitapp
+type: Opaque
+stringData:
+  POSTGRES_DB: hnitdb
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: change-this-password
+  # Standard ASP.NET Core Npgsql connection string, pointing at the in-cluster
+  # postgres Service below (same namespace, so the bare service name resolves).
+  ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=hnitdb;Username=postgres;Password=change-this-password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: hnitapp
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: hnitapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: registry.haaloft.local/library/postgres:15
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: hnitapp-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hnitapp-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hnitapp-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: hnitapp
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hnitapp
+  namespace: hnitapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hnitapp
+  template:
+    metadata:
+      labels:
+        app: hnitapp
+    spec:
+      # The app has no retry/backoff around its own first DB connection - on a
+      # fresh postgres (e.g. after deleting and recreating the PVC), initdb can
+      # still be finishing when the app makes its first connection attempt
+      # during EF Core's migration check, which throws an unhandled exception
+      # and crashes the container (seen live: killed once, restarted, and the
+      # second attempt succeeded). Blocking here until postgres is genuinely
+      # ready makes startup deterministic instead of relying on that restart.
+      initContainers:
+        - name: wait-for-postgres
+          image: registry.haaloft.local/library/postgres:15
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+      containers:
+        - name: hnitapp
+          image: registry.haaloft.local/library/hnitapp-api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: ASPNETCORE_URLS
+              value: http://+:5000
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: hnitapp-secrets
+                  key: ConnectionStrings__DefaultConnection
+          # EF Core runs "Applying migration ..." before Kestrel starts listening,
+          # so on a fresh/empty database that can easily take longer than the
+          # readiness/liveness probes' initialDelaySeconds - kubelet then sees
+          # "connection refused", kills the container mid-migration, and restarts
+          # it (seen live: both pods got killed once during first boot). A
+          # startupProbe with a generous grace period fixes this properly:
+          # readiness/liveness don't start evaluating until it succeeds once.
+          startupProbe:
+            httpGet:
+              path: /
+              port: 5000
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 5000
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hnitapp
+  namespace: hnitapp
+spec:
+  # LoadBalancer never gets an external IP on kind (no cloud LB controller) -
+  # it sits <pending> forever, same as ingress-nginx's own Service. Reached
+  # via the Ingress below instead, same as every other service in this cluster.
+  type: ClusterIP
+  selector:
+    app: hnitapp
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hnitapp
+  namespace: hnitapp
+  annotations:
+    cert-manager.io/cluster-issuer: haaloft-ca-issuer
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - hnitapp.haaloft.local
+      secretName: hnitapp-tls
+  rules:
+    - host: hnitapp.haaloft.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hnitapp
+                port:
+                  number: 80

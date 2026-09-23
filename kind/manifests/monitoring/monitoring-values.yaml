@@ -1,0 +1,107 @@
+# ============================================================================
+# kube-prometheus-stack - Prometheus + Grafana + Node Exporter
+# Chart: prometheus-community/kube-prometheus-stack
+# Sized for a single-node kind cluster running on a laptop
+# ============================================================================
+
+# --- Prometheus ---
+prometheus:
+  prometheusSpec:
+    # Shorter retention than the home-lab cluster - this is a local dev cluster
+    retention: 7d
+    retentionSize: "3GB"
+
+    # Storage for metrics (kind's built-in local-path-provisioner)
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: standard
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 4Gi
+
+    # Scrape interval
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    # Resource limits
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+# --- Grafana ---
+grafana:
+  adminUser: admin
+  adminPassword: changeme-grafana-admin
+
+  persistence:
+    enabled: true
+    storageClassName: standard
+    size: 2Gi
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.haaloft.local
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.haaloft.local
+    annotations:
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+  # Default dashboards are included automatically:
+  # - K8S cluster overview
+  # - Node exporter
+  # - Pod/container metrics
+  # - etcd
+  # - API server
+  # - CoreDNS
+
+# --- Alertmanager ---
+alertmanager:
+  enabled: false  # Enable later if you want alerting
+
+# --- Node Exporter ---
+nodeExporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+# --- Kube State Metrics ---
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# --- Component monitors ---
+kubeApiServer:
+  enabled: true
+kubeControllerManager:
+  enabled: false  # not reachable on kind's kubeadm-managed control plane
+kubeScheduler:
+  enabled: false  # not reachable on kind's kubeadm-managed control plane
+kubeProxy:
+  enabled: true
+kubeEtcd:
+  enabled: false  # not reachable on kind's kubeadm-managed control plane
+coreDns:
+  enabled: true

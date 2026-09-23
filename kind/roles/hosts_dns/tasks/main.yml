@@ -1,0 +1,34 @@
+---
+# ============================================================================
+# DNS for *.{{ domain }} via static /etc/hosts entries.
+#
+# kind has no minikube-style ingress-dns addon: the cluster's Ingress is
+# reached through the host ports podman mapped when the kind cluster was
+# created (see group_vars/all.yml: ingress_http_port/ingress_https_port),
+# which podman forwards to 127.0.0.1 on this Mac. Replaces ansible/'s
+# dedicated BIND server + CoreDNS forward zone.
+# ============================================================================
+
+- name: Manage static /etc/hosts entries for {{ domain }} services
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - haaloft kind"
+    state: "{{ hosts_dns_state | default('present') }}"
+    block: |
+      127.0.0.1 registry.{{ domain }}
+      127.0.0.1 auth.{{ domain }}
+      127.0.0.1 vault.{{ domain }}
+      127.0.0.1 grafana.{{ domain }}
+      127.0.0.1 myapp.{{ domain }}
+      127.0.0.1 home.{{ domain }}
+      127.0.0.1 zigbee.{{ domain }}
+  become: true
+
+- name: Note about non-standard ingress ports
+  ansible.builtin.debug:
+    msg: >
+      DNS for *.{{ domain }} now resolves to 127.0.0.1. The kind cluster's ingress is
+      exposed on host ports {{ ingress_http_port }} (http) and {{ ingress_https_port }} (https)
+      rather than 80/443, so include the port in URLs, e.g.
+      https://vault.{{ domain }}:{{ ingress_https_port }}
+  when: hosts_dns_state | default('present') == 'present'

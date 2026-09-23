@@ -1,0 +1,31 @@
+---
+# Prometheus + Grafana monitoring stack
+
+- name: Install kube-prometheus-stack
+  ansible.builtin.command: >
+    helm upgrade --install monitoring prometheus-community/kube-prometheus-stack
+    --namespace monitoring --create-namespace
+    --kube-context {{ kube_context }}
+    --values {{ manifests_dir }}/monitoring/monitoring-values.yaml
+    --timeout 10m
+  become: false
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.shell: |
+    kubectl -n monitoring --context {{ kube_context }} wait --for=condition=Available deployment/monitoring-grafana --timeout=180s
+  become: false
+  retries: 3
+  delay: 30
+  register: grafana_ready
+  until: grafana_ready is not failed
+  changed_when: false
+
+- name: Display monitoring info
+  ansible.builtin.debug:
+    msg: |
+      Monitoring stack deployed!
+      Grafana:    https://grafana.{{ domain }}:{{ ingress_https_port }}
+      User:       admin
+      Password:   changeme-grafana-admin
+      Prometheus: In-cluster at monitoring-kube-prometheus-prometheus.monitoring:9090
+      Retention:  7 days / 3GB max (trimmed for a local dev cluster)

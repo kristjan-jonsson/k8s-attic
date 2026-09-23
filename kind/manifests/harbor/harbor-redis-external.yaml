@@ -1,0 +1,64 @@
+# ============================================================================
+# External Redis for Harbor
+#
+# Harbor's bundled internal Redis (docker.io/goharbor/valkey-photon) has no
+# arm64 image at all, so on Apple Silicon it only runs under QEMU emulation
+# inside the kind node - and that emulated binary segfaults reliably. This
+# swaps it for the official docker.io/library/redis image (real arm64
+# builds) wired in via Harbor's redis.type=external, same pattern already
+# used for Keycloak's plain-manifest Postgres instead of a Helm chart.
+#
+# No persistence: Harbor uses this purely as an ephemeral cache/job queue for
+# local dev, so a restart clearing it is fine.
+# ============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbor-redis-external
+  namespace: harbor
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: harbor-redis-external
+  template:
+    metadata:
+      labels:
+        app: harbor-redis-external
+    spec:
+      containers:
+        - name: redis
+          image: docker.io/library/redis:7-alpine
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbor-redis-external
+  namespace: harbor
+spec:
+  selector:
+    app: harbor-redis-external
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

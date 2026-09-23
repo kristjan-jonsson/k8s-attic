@@ -1,0 +1,27 @@
+---
+# cert-manager installation and configuration
+
+- name: Install cert-manager
+  ansible.builtin.command: >
+    helm upgrade --install cert-manager jetstack/cert-manager
+    --namespace cert-manager --create-namespace
+    --kube-context {{ kube_context }}
+    --values {{ manifests_dir }}/cert-manager/cert-manager-values.yaml
+    --set installCRDs=true
+    --set startupapicheck.timeout=5m
+    --wait --timeout 10m
+  become: false
+  # The startupapicheck post-install hook Job defaults to a 1m timeout per attempt
+  # and a backoffLimit of 4 - on a freshly-created cluster where the webhook/cainjector
+  # are still warming up (cache sync, leader election), that combination can exhaust
+  # its retries before the webhook actually becomes reachable. A longer per-attempt
+  # timeout lets the very first attempt succeed instead of needing several retries.
+
+- name: Wait for cert-manager webhook
+  ansible.builtin.pause:
+    seconds: 15
+
+- name: Apply cluster issuers
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/cert-manager/cluster-issuers.yaml --context {{ kube_context }}
+  become: false

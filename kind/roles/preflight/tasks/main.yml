@@ -1,0 +1,98 @@
+---
+# ============================================================================
+# Verify the kind cluster is reachable before deploying anything.
+# This automation does NOT create/manage the kind cluster itself - create it
+# yourself with `kind create cluster` (see README.md for the expected shape:
+# a node labeled ingress-ready=true, with host ports mapped for 80/443).
+# ============================================================================
+
+- name: Check kubectl can reach the cluster
+  ansible.builtin.command: kubectl cluster-info --context {{ kube_context }}
+  become: false
+  register: cluster_info
+  changed_when: false
+  failed_when: false
+
+- name: Fail with a clear message if the cluster isn't reachable
+  ansible.builtin.fail:
+    msg: >
+      Could not reach kubectl context '{{ kube_context }}'. This automation assumes a kind
+      cluster already exists - create one first, e.g.:
+        kind create cluster --name {{ kind_cluster_name }}
+      then label the control-plane node for ingress and re-run:
+        kubectl label node {{ kind_cluster_name }}-control-plane ingress-ready=true --overwrite
+  when: cluster_info.rc != 0
+
+- name: Check the ingress-ready node label is present
+  ansible.builtin.command: >
+    kubectl get nodes --context {{ kube_context }} -l ingress-ready=true -o name
+  become: false
+  register: ingress_ready_nodes
+  changed_when: false
+
+- name: Warn if no node is labeled ingress-ready=true
+  ansible.builtin.debug:
+    msg: >
+      WARNING: no node in context '{{ kube_context }}' is labeled ingress-ready=true.
+      ingress-nginx (installed via the kind-flavored manifest) expects that label on
+      the node it should bind hostPort 80/443 on. Label one, e.g.:
+        kubectl label node {{ kind_cluster_name }}-control-plane ingress-ready=true --overwrite
+  when: ingress_ready_nodes.stdout == ''
+
+# ============================================================================
+# Trust corporate TLS-interception CA(s) inside the kind node, so image pulls
+# from registry.k8s.io/docker.io/etc. don't fail with "certificate signed by
+# unknown authority". See group_vars/all.yml: corporate_ca_keychain_labels.
+# ============================================================================
+
+- name: Check corporate CA(s) are present in this Mac's System keychain
+  ansible.builtin.command: >
+    security find-certificate -c "{{ item }}" /Library/Keychains/System.keychain
+  become: false
+  register: corp_ca_check
+  loop: "{{ corporate_ca_keychain_labels }}"
+  changed_when: false
+  failed_when: false
+
+- name: Export corporate CA(s) from the System keychain
+  ansible.builtin.command: >
+    security find-certificate -c "{{ item.item }}" -p /Library/Keychains/System.keychain
+  become: false
+  register: corp_ca_export
+  loop: "{{ corp_ca_check.results }}"
+  when: item.rc == 0
+  changed_when: false
+
+- name: Write exported corporate CA(s) locally
+  ansible.builtin.copy:
+    content: "{{ item.stdout }}"
+    dest: "{{ playbook_dir }}/.corporate-ca-{{ loop_index }}.crt"
+    mode: "0644"
+  become: false
+  loop: "{{ corp_ca_export.results }}"
+  loop_control:
+    index_var: loop_index
+  when: item.skipped is not defined
+
+- name: Trust corporate CA(s) inside the kind node
+  ansible.builtin.shell: >
+    cat {{ playbook_dir }}/.corporate-ca-{{ loop_index }}.crt |
+    {{ kind_container_engine }} exec -i {{ kind_node_container }}
+    tee /usr/local/share/ca-certificates/corporate-ca-{{ loop_index }}.crt > /dev/null
+  become: false
+  loop: "{{ corp_ca_export.results }}"
+  loop_control:
+    index_var: loop_index
+  when: item.skipped is not defined
+  changed_when: true
+  notify: restart containerd in kind node
+
+- name: Refresh the kind node's CA trust store
+  ansible.builtin.command: >
+    {{ kind_container_engine }} exec {{ kind_node_container }} update-ca-certificates
+  become: false
+  when: corp_ca_export.results | selectattr('skipped', 'undefined') | list | length > 0
+  changed_when: true
+
+- name: Flush handlers now so containerd is restarted before anything pulls images
+  ansible.builtin.meta: flush_handlers

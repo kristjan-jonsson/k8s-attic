@@ -1,0 +1,181 @@
+---
+# ============================================================================
+# Harbor Container Registry
+#
+# Trusts the cluster's internal CA and configures a containerd registry
+# mirror *inside the kind node container* directly via `podman exec`/
+# `docker exec` (podman exec runs as root by default inside kind's node
+# image, so no sudo is needed) - the kind equivalent of what the original
+# ansible/ role does by templating /etc/rancher/rke2/registries.yaml on
+# real RKE2 VMs.
+# ============================================================================
+
+- name: Set manifests path fact
+  ansible.builtin.set_fact:
+    manifests_dir: "{{ playbook_dir }}/manifests"
+
+- name: Ensure harbor namespace exists
+  ansible.builtin.command: >
+    kubectl create namespace harbor --context {{ kube_context }}
+  become: false
+  register: harbor_ns_create
+  changed_when: "'created' in harbor_ns_create.stdout"
+  failed_when: harbor_ns_create.rc != 0 and 'already exists' not in harbor_ns_create.stderr
+
+- name: Deploy external Redis for Harbor
+  # Must exist before the chart install - Harbor's core/jobservice connect to
+  # it on startup and don't retry indefinitely if it's missing.
+  ansible.builtin.command: >
+    kubectl apply -f {{ manifests_dir }}/harbor/harbor-redis-external.yaml --context {{ kube_context }}
+  become: false
+
+- name: Wait for external Redis to be ready
+  ansible.builtin.command: >
+    kubectl -n harbor --context {{ kube_context }} wait --for=condition=Available
+    deployment/harbor-redis-external --timeout=120s
+  become: false
+  changed_when: false
+
+- name: Install Harbor
+  ansible.builtin.command: >
+    helm upgrade --install harbor harbor/harbor
+    --namespace harbor --create-namespace
+    --kube-context {{ kube_context }}
+    --values {{ manifests_dir }}/harbor/harbor-values.yaml
+    --timeout 15m
+  become: false
+
+- name: Remove leftover PVC from Harbor's old internal Redis (if present)
+  # Only relevant if this cluster previously ran with redis.type=internal.
+  # Must run AFTER the helm upgrade above: helm only prunes the internal
+  # Redis StatefulSet once redis.type flips to external and it stops being
+  # rendered - StatefulSet PVCs are never garbage collected automatically
+  # even then, so this still has to run explicitly. Deleting it any earlier
+  # (while the StatefulSet's pod still holds it) just hangs forever waiting
+  # for a finalizer that can't release yet - hence --wait=false as a
+  # belt-and-suspenders guard against that same class of deadlock.
+  ansible.builtin.command: >
+    kubectl -n harbor --context {{ kube_context }} delete pvc data-harbor-redis-0 --ignore-not-found --wait=false
+  become: false
+  changed_when: true
+
+- name: Wait for the internal CA secret to exist
+  # ansible.builtin.command parses this string with shlex (like a shell would),
+  # which consumes one level of backslash escaping before kubectl ever sees it -
+  # the jsonpath needs `ca\.crt` (escaping the literal dot in the map key), so the
+  # source has to say `ca\\.crt` for a single backslash to survive.
+  ansible.builtin.command: >
+    kubectl -n cert-manager --context {{ kube_context }} get secret haaloft-ca-secret -o jsonpath={.data.ca\\.crt}
+  become: false
+  register: ca_secret
+  retries: 30
+  delay: 10
+  until: ca_secret.rc == 0 and ca_secret.stdout != ''
+  changed_when: false
+
+- name: Write the internal CA cert locally
+  ansible.builtin.copy:
+    content: "{{ ca_secret.stdout | b64decode }}"
+    dest: "{{ playbook_dir }}/.haaloft-ca.crt"
+    mode: "0644"
+  become: false
+
+- name: Trust the internal CA inside the kind node
+  ansible.builtin.shell: >
+    cat {{ playbook_dir }}/.haaloft-ca.crt |
+    {{ kind_container_engine }} exec -i {{ kind_node_container }}
+    tee /usr/local/share/ca-certificates/haaloft-ca.crt > /dev/null
+  become: false
+  changed_when: true
+
+- name: Refresh the kind node's CA trust store
+  ansible.builtin.command: >
+    {{ kind_container_engine }} exec {{ kind_node_container }} update-ca-certificates
+  become: false
+  changed_when: true
+
+- name: Make {{ harbor_host }} resolvable inside the kind node
+  # containerd (inside the node) has no DNS for haaloft.local - it only reaches the
+  # registry through the ingress controller's hostPort, which is bound on the node's
+  # OWN network namespace, so 127.0.0.1 from inside the node reaches it directly.
+  ansible.builtin.shell: >
+    {{ kind_container_engine }} exec {{ kind_node_container }}
+    sh -c 'grep -q "{{ harbor_host }}" /etc/hosts || echo "127.0.0.1 {{ harbor_host }}" >> /etc/hosts'
+  become: false
+  changed_when: true
+
+- name: Check if containerd's registry config_path is already set
+  ansible.builtin.command: >
+    {{ kind_container_engine }} exec {{ kind_node_container }}
+    grep -q config_path /etc/containerd/config.toml
+  become: false
+  register: containerd_config_path_check
+  changed_when: false
+  failed_when: false
+
+- name: Template containerd registry config_path snippet locally
+  ansible.builtin.template:
+    src: containerd-registry-config-path.toml.j2
+    dest: "{{ playbook_dir }}/.containerd-registry-config-path.toml"
+    mode: "0644"
+  become: false
+  when: containerd_config_path_check.rc != 0
+
+- name: Enable containerd's certs.d registry config_path mechanism
+  ansible.builtin.shell: >
+    cat {{ playbook_dir }}/.containerd-registry-config-path.toml |
+    {{ kind_container_engine }} exec -i {{ kind_node_container }}
+    tee -a /etc/containerd/config.toml > /dev/null
+  become: false
+  when: containerd_config_path_check.rc != 0
+  changed_when: true
+  notify: restart containerd in kind node
+
+- name: Create containerd registry mirror directory inside the kind node
+  ansible.builtin.command: >
+    {{ kind_container_engine }} exec {{ kind_node_container }}
+    mkdir -p /etc/containerd/certs.d/{{ harbor_host }}
+  become: false
+  changed_when: true
+
+- name: Template containerd registry mirror config locally
+  ansible.builtin.template:
+    src: containerd-hosts.toml.j2
+    dest: "{{ playbook_dir }}/.containerd-hosts.toml"
+    mode: "0644"
+  become: false
+
+- name: Copy containerd registry mirror config into the kind node
+  ansible.builtin.shell: >
+    cat {{ playbook_dir }}/.containerd-hosts.toml |
+    {{ kind_container_engine }} exec -i {{ kind_node_container }}
+    tee /etc/containerd/certs.d/{{ harbor_host }}/hosts.toml > /dev/null
+  become: false
+  changed_when: true
+  notify: restart containerd in kind node
+
+- name: Flush handlers now so containerd is restarted before we finish
+  ansible.builtin.meta: flush_handlers
+
+- name: Display Harbor info
+  ansible.builtin.debug:
+    msg: |
+      Harbor deployed!
+      UI:       https://{{ harbor_host }}:{{ ingress_https_port }}
+      User:     admin
+      Password: {{ harbor_admin_password }}
+
+      The internal CA has been trusted inside the kind node, so in-cluster image
+      pulls/pushes from {{ harbor_host }} work without extra configuration.
+
+      To push from THIS Mac (docker/podman CLI), trust the CA locally too, e.g.:
+        macOS system trust store:
+          sudo security add-trusted-cert -d -r trustRoot \
+            -k /Library/Keychains/System.keychain .haaloft-ca.crt
+        or add {{ harbor_host }}:{{ ingress_https_port }} as an insecure registry in
+        Docker/Podman Desktop settings.
+
+      Then:
+        docker login {{ harbor_host }}:{{ ingress_https_port }}
+        docker tag myapp:latest {{ harbor_host }}:{{ ingress_https_port }}/library/myapp:latest
+        docker push {{ harbor_host }}:{{ ingress_https_port }}/library/myapp:latest

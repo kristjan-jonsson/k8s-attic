@@ -1,0 +1,67 @@
+# ============================================================================
+# Global variables for the Haaloft K8S cluster - kind (local dev) version
+# ============================================================================
+
+# --- Domain ---
+# Kept identical to ansible/'s domain since the manifests under manifests/
+# hardcode *.haaloft.local hostnames (not templated, same convention as ansible/).
+domain: haaloft.local
+cluster_name: haaloft
+
+# --- kind cluster ---
+# This automation assumes the kind cluster already exists (created outside
+# Ansible, e.g. `kind create cluster --name kind-cluster`) - see README.md.
+kind_cluster_name: kind-cluster
+kind_node_container: "{{ kind_cluster_name }}-control-plane"
+kind_container_engine: podman    # or: docker
+kube_context: "kind-{{ kind_cluster_name }}"
+
+# Host ports the kind cluster's control-plane container maps to the node's
+# 80/443 (set at `kind create cluster` time via extraPortMappings). Check
+# with `podman ps` / `docker ps` if unsure - adjust these to match.
+ingress_http_port: 9090
+ingress_https_port: 9443
+
+# --- Corporate network TLS interception ---
+# Some corporate networks terminate outbound HTTPS through a TLS-decrypt proxy using a
+# root CA (confirm via `openssl s_client -connect registry.k8s.io:443`). The kind node
+# container doesn't trust it by default, so ANY image pull from registry.k8s.io,
+# docker.io, etc. fails with "certificate signed by unknown authority" until it's
+# installed into the node's trust store (see roles/preflight). If such a CA is already
+# trusted on your Mac via Jamf/MDM (exported from the System keychain), set its
+# keychain label(s) via the CORPORATE_CA_KEYCHAIN_LABELS env var (comma-separated) -
+# see .env.example. Leave unset to skip this step entirely (e.g. on a non-corporate
+# network).
+corporate_ca_keychain_labels: "{{ (lookup('ansible.builtin.env', 'CORPORATE_CA_KEYCHAIN_LABELS') | default('', true)).split(',') | select() | list }}"
+
+# --- cert-manager ---
+cert_issuer: haaloft-ca-issuer
+acme_email: your-email@example.com
+
+# --- Service URLs (hostnames only - append :{{ ingress_https_port }} for actual URLs) ---
+harbor_host: "registry.{{ domain }}"
+keycloak_host: "auth.{{ domain }}"
+vault_host: "vault.{{ domain }}"
+grafana_host: "grafana.{{ domain }}"
+
+# --- Keycloak ---
+keycloak_admin_user: admin
+keycloak_admin_password: "changeme-use-vault-secret"
+keycloak_pg_password: "changeme-pg-keycloak"
+
+# --- Harbor ---
+harbor_admin_password: "changeme-harbor-admin"
+
+# ============================================================================
+# Services to deploy
+# Always deployed: ingress, cert-manager
+# Optional services: toggle true/false below
+# ============================================================================
+services:
+  vault: true
+  keycloak: true
+  harbor: true
+  monitoring: true
+  homeassistant: false
+  mqtt: false
+  zigbee2mqtt: false
