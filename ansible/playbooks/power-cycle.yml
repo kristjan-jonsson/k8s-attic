@@ -1,0 +1,130 @@
+---
+# ============================================================================
+# Power-cycle cluster VMs one at a time (rolling)
+# Run: ansible-playbook playbooks/power-cycle.yml
+#
+# A guest reboot keeps the same QEMU process, so changes to the libvirt
+# domain (vCPUs, memory) only apply after a full shutdown and start.
+#
+# For each node (one at a time):
+#   - Cordon and drain
+#   - virsh shutdown, wait for "shut off", virsh start
+#   - Wait for RKE2 and the node to be Ready, then uncordon
+#   - Wait for Longhorn volumes to be healthy before the next node
+# ============================================================================
+
+- name: Discover VM IPs
+  ansible.builtin.import_playbook: discover-vms.yml
+
+- name: Power-cycle cluster VMs (rolling)
+  hosts: rke2_cluster
+  become: true
+  serial: 1
+  gather_facts: false
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+  tasks:
+    - name: Get node name in K8S
+      ansible.builtin.shell: |
+        kubectl get nodes -o name | grep "$(hostname)" | head -1
+      register: k8s_node_name
+      changed_when: false
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: "Cordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl cordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    - name: "Drain {{ inventory_hostname }}"
+      ansible.builtin.command: >
+        kubectl drain {{ k8s_node_name.stdout }}
+        --ignore-daemonsets
+        --delete-emptydir-data
+        --timeout=300s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    - name: "Shut down {{ inventory_hostname }}"
+      ansible.builtin.command: "virsh shutdown {{ inventory_hostname }}"
+      delegate_to: localhost
+      connection: local
+
+    - name: "Wait for {{ inventory_hostname }} to be shut off"
+      ansible.builtin.command: "virsh domstate {{ inventory_hostname }}"
+      register: dom_state
+      until: "'shut off' in dom_state.stdout"
+      retries: 36
+      delay: 5
+      changed_when: false
+      delegate_to: localhost
+      connection: local
+
+    - name: "Start {{ inventory_hostname }}"
+      ansible.builtin.command: "virsh start {{ inventory_hostname }}"
+      delegate_to: localhost
+      connection: local
+
+    - name: Wait for SSH
+      ansible.builtin.wait_for_connection:
+        delay: 15
+        timeout: 300
+
+    - name: Load iptables modules after boot
+      ansible.builtin.command: "modprobe {{ item }}"
+      loop:
+        - ip_tables
+        - iptable_filter
+        - iptable_nat
+      changed_when: false
+
+    - name: Show vCPU count
+      ansible.builtin.command: nproc
+      register: vcpus
+      changed_when: false
+
+    - name: Wait for RKE2 to be active
+      ansible.builtin.shell: |
+        systemctl is-active rke2-server 2>/dev/null || systemctl is-active rke2-agent 2>/dev/null
+      retries: 30
+      delay: 10
+      register: rke2_ready
+      until: rke2_ready is not failed
+      changed_when: false
+
+    # Retries cover the API server being briefly down after the server restarts
+    - name: Wait for node to be Ready in K8S
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready {{ k8s_node_name.stdout }} --timeout=300s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: node_ready
+      retries: 10
+      delay: 15
+      until: node_ready is not failed
+      changed_when: false
+      when: k8s_node_name.stdout | length > 0
+
+    - name: "Uncordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl uncordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      when: k8s_node_name.stdout | length > 0
+
+    # With 2 replicas per volume, taking down the next node while replicas
+    # are still rebuilding could leave a volume without a healthy copy.
+    - name: Wait for Longhorn volumes to finish rebuilding
+      ansible.builtin.shell: |
+        kubectl -n longhorn-system get volumes.longhorn.io \
+          -o jsonpath='{range .items[*]}{.status.robustness}{"\n"}{end}' \
+          | grep -qE 'degraded|faulted' && exit 1 || exit 0
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: lh_healthy
+      retries: 60
+      delay: 20
+      until: lh_healthy is not failed
+      changed_when: false
+
+    - name: Show summary
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: power-cycled, {{ vcpus.stdout }} vCPUs"
