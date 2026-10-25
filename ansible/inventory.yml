@@ -4,7 +4,7 @@ all:
     dns_servers:
       hosts:
         dns-01:
-          ansible_host: 192.168.1.2    # Update with DNS server IP
+          ansible_host: 192.168.0.52   # Update with DNS server IP
 
     # These groups are populated dynamically by discover-vms.yml
     # after discovering DHCP-assigned IPs via virsh on localhost.

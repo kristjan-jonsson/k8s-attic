@@ -1,28 +1,32 @@
 ---
-# CoreDNS custom configuration - forward *.haaloft.local to BIND
+# CoreDNS - forward *.haaloft.local to BIND via the rke2-coredns chart values.
+# RKE2 re-renders the chart and CoreDNS reloads the new Corefile on its own.
 
-- name: Template CoreDNS custom config
+- name: Template CoreDNS HelmChartConfig
   ansible.builtin.template:
-    src: coredns-custom.yaml.j2
-    dest: /tmp/coredns-custom.yaml
+    src: coredns-helmchartconfig.yaml.j2
+    dest: /tmp/coredns-helmchartconfig.yaml
     mode: "0644"
 
-- name: Apply CoreDNS custom config
+- name: Apply CoreDNS HelmChartConfig
   ansible.builtin.command: >
-    kubectl apply -f /tmp/coredns-custom.yaml
+    kubectl apply -f /tmp/coredns-helmchartconfig.yaml
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  register: coredns_apply
+  changed_when: "'unchanged' not in coredns_apply.stdout"
 
-- name: Restart CoreDNS to pick up changes
+- name: Remove old unused CoreDNS custom ConfigMap
   ansible.builtin.command: >
-    kubectl -n kube-system rollout restart deployment rke2-coredns-rke2-coredns
+    kubectl -n kube-system delete configmap rke2-coredns-rke2-coredns-custom --ignore-not-found
   environment:
     KUBECONFIG: /home/rke/.kube/config
     PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
-  ignore_errors: true
+  register: coredns_cm_delete
+  changed_when: "'deleted' in coredns_cm_delete.stdout"
 
 - name: Clean up temp file
   ansible.builtin.file:
-    path: /tmp/coredns-custom.yaml
+    path: /tmp/coredns-helmchartconfig.yaml
     state: absent

@@ -301,7 +301,7 @@ k8s-haaloft/
 │       │   │   ├── keycloak.yml
 │       │   │   └── coredns.yml
 │       │   └── templates/
-│       │       └── coredns-custom.yaml.j2
+│       │       └── coredns-helmchartconfig.yaml.j2
 │       └── harbor/                     # Container registry
 └── manifests/
     ├── ingress/

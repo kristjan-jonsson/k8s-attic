@@ -32,7 +32,7 @@ vms:
     role: agent
 
 # --- DNS (BIND / named) ---
-dns_server_ip: 192.168.1.2  # Must match dns-01 ansible_host in inventory
+dns_server_ip: 192.168.0.52  # Must match dns-01 ansible_host in inventory
 
 # --- Service URLs ---
 harbor_host: "registry.{{ domain }}"
