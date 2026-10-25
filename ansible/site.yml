@@ -59,7 +59,7 @@
 - name: Deploy cluster services
   hosts: rke2_servers
   become: true
-  tags: [services, ingress, cert-manager, longhorn, vault, keycloak, coredns, monitoring, homeassistant, mqtt, zigbee, demo]
+  tags: [services, ingress, cert-manager, longhorn, vault, keycloak, coredns, argocd, monitoring, homeassistant, mqtt, zigbee, demo]
   roles:
     - cluster_services
 
@@ -94,6 +94,7 @@
             Secrets:      https://{{ vault_host }}
             Auth:         https://{{ keycloak_host }}
             Registry:     https://{{ harbor_host }}
+            GitOps:       https://{{ argocd_host }}
 
           DNS: *.{{ domain }} registered on {{ dns_server_ip }} (BIND)
 

@@ -39,6 +39,7 @@ harbor_host: "registry.{{ domain }}"
 keycloak_host: "auth.{{ domain }}"
 vault_host: "vault.{{ domain }}"
 longhorn_host: "longhorn.{{ domain }}"
+argocd_host: "argocd.{{ domain }}"
 
 # --- cert-manager ---
 cert_issuer: haaloft-ca-issuer
@@ -63,6 +64,7 @@ services:
   keycloak: true
   harbor: true
   monitoring: true
+  argocd: true
   homeassistant: false
   mqtt: false
   zigbee2mqtt: false

@@ -34,6 +34,7 @@
     - { name: hashicorp, url: "https://helm.releases.hashicorp.com" }
     - { name: bitnami, url: "https://charts.bitnami.com/bitnami" }
     - { name: harbor, url: "https://helm.goharbor.io" }
+    - { name: argo, url: "https://argoproj.github.io/argo-helm" }
   environment:
     PATH: "/usr/local/bin:/usr/bin:/bin"
   changed_when: false

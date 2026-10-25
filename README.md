@@ -30,6 +30,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
                           │ Vault           │  ← Secret management
                           │ Keycloak        │  ← Identity / SSO
                           │ Harbor          │  ← Container registry
+                          │ ArgoCD          │  ← GitOps deployments
                           │ CoreDNS         │  ← Service discovery
                           └─────────────────┘
 ```
@@ -45,6 +46,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 | Vault           | Secret management      | https://vault.haaloft.local       |
 | Keycloak        | Identity & SSO         | https://auth.haaloft.local        |
 | Harbor          | Container registry     | https://registry.haaloft.local    |
+| ArgoCD          | GitOps deployments     | https://argocd.haaloft.local      |
 | CoreDNS         | Service discovery      | Built into RKE2                   |
 
 ## Prerequisites

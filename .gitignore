@@ -1,3 +1,4 @@
 .vault-credentials
+.argocd-credentials
 kubeconfig
 *.retry
