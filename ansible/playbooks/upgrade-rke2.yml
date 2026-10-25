@@ -26,7 +26,7 @@
   gather_facts: false
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
   tasks:
     - name: Require rke2_target_minor
@@ -68,7 +68,7 @@
   order: inventory  # discover-vms.yml adds servers before agents
   environment:
     KUBECONFIG: /etc/rancher/rke2/rke2.yaml
-    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
   vars:
     rke2_role: "{{ 'server' if inventory_hostname in groups['rke2_servers'] else 'agent' }}"
 

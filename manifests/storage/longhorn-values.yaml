@@ -23,6 +23,10 @@ defaultSettings:
   # Auto-delete workload pod when volume is detached unexpectedly
   autoDeletePodWhenVolumeDetachedUnexpectedly: true
 
+  # Let rolling node drains (update-reboot.yml) proceed when a node holds the
+  # last replica of a detached volume. The default blocks the drain forever.
+  nodeDrainPolicy: allow-if-replica-is-stopped
+
 # Enable the Longhorn UI
 longhornUI:
   replicas: 1
