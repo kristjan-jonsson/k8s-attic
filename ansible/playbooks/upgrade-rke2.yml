@@ -1,0 +1,155 @@
+---
+# ============================================================================
+# Upgrade RKE2 / Kubernetes to a new minor version (rolling)
+# Run: ansible-playbook playbooks/upgrade-rke2.yml -e rke2_target_minor=1.35
+#
+# This will:
+#   1. Discover VM IPs
+#   2. Check the target is the current minor or the next one
+#      (Kubernetes can't skip minor versions)
+#   3. For each node (one at a time, servers before agents):
+#      - Cordon and drain
+#      - Point the rancher-rke2 dnf repo at the target minor
+#      - Upgrade the RKE2 package and restart the service
+#      - Wait for Ready, check the kubelet version, uncordon
+#
+# Patch releases within the current minor are handled by update-reboot.yml.
+# Read the RKE2 release notes for the target version before running this.
+# ============================================================================
+
+- name: Discover VM IPs
+  ansible.builtin.import_playbook: discover-vms.yml
+
+- name: Pre-flight checks
+  hosts: rke2_servers[0]
+  become: true
+  gather_facts: false
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+  tasks:
+    - name: Require rke2_target_minor
+      ansible.builtin.assert:
+        that:
+          - rke2_target_minor is defined
+          - rke2_target_minor | string is match('^1\.[0-9]+$')
+        fail_msg: "Pass the target minor version, e.g. -e rke2_target_minor=1.35"
+
+    - name: Get current RKE2 version
+      ansible.builtin.command: rpm -q --queryformat '%{VERSION}' rke2-server
+      register: current_rpm
+      changed_when: false
+
+    - name: Check all nodes are Ready before starting
+      ansible.builtin.command: >
+        kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}={.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+      register: node_status
+      changed_when: false
+      failed_when: "'=False' in node_status.stdout or '=Unknown' in node_status.stdout"
+
+    - name: Check target is the current or next minor version
+      vars:
+        current_minor: "{{ current_rpm.stdout.split('.')[1] | int }}"
+        target_minor: "{{ (rke2_target_minor | string).split('.')[1] | int }}"
+      ansible.builtin.assert:
+        that:
+          - target_minor | int >= current_minor | int
+          - target_minor | int <= current_minor | int + 1
+        fail_msg: >
+          Cluster is on {{ current_rpm.stdout }}. Target 1.{{ target_minor }} must be
+          1.{{ current_minor }} or 1.{{ current_minor | int + 1 }} (one minor at a time).
+        success_msg: "Upgrading from {{ current_rpm.stdout }} to {{ rke2_target_minor }}"
+
+- name: Upgrade RKE2 nodes (rolling)
+  hosts: rke2_cluster
+  become: true
+  serial: 1
+  order: inventory  # discover-vms.yml adds servers before agents
+  environment:
+    KUBECONFIG: /etc/rancher/rke2/rke2.yaml
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  vars:
+    rke2_role: "{{ 'server' if inventory_hostname in groups['rke2_servers'] else 'agent' }}"
+
+  tasks:
+    - name: Get node name in K8S
+      ansible.builtin.shell: |
+        kubectl get nodes -o name | grep "$(hostname)" | head -1
+      register: k8s_node_name
+      changed_when: false
+      failed_when: k8s_node_name.stdout | length == 0
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: "Cordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl cordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: "Drain {{ inventory_hostname }}"
+      ansible.builtin.command: >
+        kubectl drain {{ k8s_node_name.stdout }}
+        --ignore-daemonsets
+        --delete-emptydir-data
+        --timeout=120s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: Point rancher-rke2 repo at target minor
+      ansible.builtin.replace:
+        path: /etc/yum.repos.d/rancher-rke2.repo
+        regexp: "{{ item.regexp }}"
+        replace: "{{ item.replace }}"
+      loop:
+        - { regexp: '\[rancher-rke2-[0-9]+\.[0-9]+-stable\]', replace: '[rancher-rke2-{{ rke2_target_minor }}-stable]' }
+        - { regexp: 'Rancher RKE2 [0-9]+\.[0-9]+ \(stable\)', replace: 'Rancher RKE2 {{ rke2_target_minor }} (stable)' }
+        - { regexp: '/rke2/stable/[0-9]+\.[0-9]+/', replace: '/rke2/stable/{{ rke2_target_minor }}/' }
+
+    - name: Upgrade RKE2 package
+      ansible.builtin.dnf:
+        name: "rke2-{{ rke2_role }}"
+        state: latest
+        update_cache: true
+      register: rke2_pkg
+
+    - name: Restart RKE2
+      ansible.builtin.systemd:
+        name: "rke2-{{ rke2_role }}"
+        state: restarted
+        daemon_reload: true
+      when: rke2_pkg.changed
+
+    - name: Wait for RKE2 service to be active
+      ansible.builtin.command: "systemctl is-active rke2-{{ rke2_role }}"
+      register: rke2_active
+      retries: 30
+      delay: 10
+      until: rke2_active.rc == 0
+      changed_when: false
+
+    # Retries cover the API server being briefly down after a server restart
+    - name: Wait for node to be Ready in K8S
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready {{ k8s_node_name.stdout }} --timeout=300s
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: node_ready
+      retries: 10
+      delay: 15
+      until: node_ready is not failed
+      changed_when: false
+
+    - name: Check node runs the target version
+      ansible.builtin.command: >
+        kubectl get {{ k8s_node_name.stdout }} -o jsonpath='{.status.nodeInfo.kubeletVersion}'
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: kubelet_version
+      retries: 10
+      delay: 10
+      until: kubelet_version.stdout is match('v' ~ (rke2_target_minor | string | regex_escape) ~ '\.')
+      changed_when: false
+
+    - name: "Uncordon {{ inventory_hostname }}"
+      ansible.builtin.command: "kubectl uncordon {{ k8s_node_name.stdout }}"
+      delegate_to: "{{ groups['rke2_servers'][0] }}"
+
+    - name: Show upgrade summary
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: now on {{ kubelet_version.stdout }}"

@@ -26,7 +26,7 @@
   environment:
     INSTALL_RKE2_VERSION: "{{ rke2_version | default(omit) }}"
   args:
-    creates: /usr/local/bin/rke2
+    creates: /usr/bin/rke2  # RPM install path on OL9
 
 - name: Override RKE2 server systemd timeout
   ansible.builtin.file:

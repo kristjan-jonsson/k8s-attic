@@ -27,7 +27,7 @@
     INSTALL_RKE2_TYPE: agent
     INSTALL_RKE2_VERSION: "{{ rke2_version | default(omit) }}"
   args:
-    creates: /usr/local/bin/rke2
+    creates: /usr/bin/rke2  # RPM install path on OL9
 
 - name: Enable and start RKE2 agent
   ansible.builtin.systemd:

@@ -8,8 +8,8 @@
 #   2. For each node (one at a time):
 #      - Cordon (prevent new pods)
 #      - Drain (evict existing pods)
-#      - Run dnf update
-#      - Reboot if needed
+#      - Run dnf update (includes RKE2 patch releases in the current minor)
+#      - Reboot if needed, or restart RKE2 if only its package changed
 #      - Uncordon (allow pods again)
 # ============================================================================
 
@@ -46,11 +46,24 @@
       delegate_to: "{{ groups['rke2_servers'][0] }}"
       when: k8s_node_name.stdout | length > 0
 
+    - name: Record RKE2 package version before update
+      ansible.builtin.command: rpm -q rke2-server rke2-agent
+      register: rke2_rpm_before
+      changed_when: false
+      failed_when: false
+
     - name: Run dnf update
       ansible.builtin.dnf:
         name: "*"
         state: latest
       register: dnf_update
+
+    # dnf can bring in a new RKE2 patch release from the rancher-rke2 repo
+    - name: Record RKE2 package version after update
+      ansible.builtin.command: rpm -q rke2-server rke2-agent
+      register: rke2_rpm_after
+      changed_when: false
+      failed_when: false
 
     - name: Install netfilter modules for new kernel (if kernel was updated)
       ansible.builtin.shell: |
@@ -82,7 +95,17 @@
       changed_when: false
       when: reboot_check.rc != 0
 
-    - name: Wait for RKE2 to be ready after reboot
+    # Package upgrades don't restart the service, so restart it here
+    # (a reboot already starts the new version).
+    - name: Restart RKE2 if its package was upgraded
+      ansible.builtin.systemd:
+        name: "{{ 'rke2-server' if inventory_hostname in groups['rke2_servers'] else 'rke2-agent' }}"
+        state: restarted
+      when:
+        - rke2_rpm_before.stdout != rke2_rpm_after.stdout
+        - reboot_check.rc == 0
+
+    - name: Wait for RKE2 to be ready after reboot or restart
       ansible.builtin.shell: |
         systemctl is-active rke2-server 2>/dev/null || systemctl is-active rke2-agent 2>/dev/null
       retries: 30
@@ -90,12 +113,17 @@
       register: rke2_ready
       until: rke2_ready is not failed
       changed_when: false
-      when: reboot_check.rc != 0
+      when: reboot_check.rc != 0 or rke2_rpm_before.stdout != rke2_rpm_after.stdout
 
+    # Retries cover the API server being briefly down after a server restart
     - name: Wait for node to be Ready in K8S
       ansible.builtin.shell: |
         kubectl wait --for=condition=Ready {{ k8s_node_name.stdout }} --timeout=300s
       delegate_to: "{{ groups['rke2_servers'][0] }}"
+      register: node_ready
+      retries: 10
+      delay: 15
+      until: node_ready is not failed
       changed_when: false
       when: k8s_node_name.stdout | length > 0
 
@@ -108,4 +136,5 @@
       ansible.builtin.debug:
         msg: >
           {{ inventory_hostname }}: updated={{ dnf_update.changed }},
-          rebooted={{ reboot_check.rc != 0 }}
+          rebooted={{ reboot_check.rc != 0 }},
+          rke2_upgraded={{ rke2_rpm_before.stdout != rke2_rpm_after.stdout }}
