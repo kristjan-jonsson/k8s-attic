@@ -28,7 +28,7 @@ server:
       cert-manager.io/cluster-issuer: haaloft-ca-issuer
   resources:
     requests:
-      cpu: 50m
+      cpu: 25m
       memory: 128Mi
     limits:
       memory: 256Mi
@@ -37,7 +37,7 @@ controller:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 256Mi
     limits:
       memory: 1Gi
@@ -46,7 +46,7 @@ repoServer:
   replicas: 1
   resources:
     requests:
-      cpu: 50m
+      cpu: 25m
       memory: 128Mi
     limits:
       memory: 512Mi

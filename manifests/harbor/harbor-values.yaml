@@ -48,7 +48,7 @@ database:
   internal:
     resources:
       requests:
-        cpu: 100m
+        cpu: 50m
         memory: 256Mi
       limits:
         memory: 512Mi
@@ -59,7 +59,7 @@ redis:
   internal:
     resources:
       requests:
-        cpu: 50m
+        cpu: 25m
         memory: 64Mi
       limits:
         memory: 128Mi
@@ -68,7 +68,7 @@ redis:
 core:
   resources:
     requests:
-      cpu: 100m
+      cpu: 25m
       memory: 256Mi
     limits:
       memory: 512Mi
@@ -77,7 +77,7 @@ core:
 registry:
   resources:
     requests:
-      cpu: 100m
+      cpu: 25m
       memory: 256Mi
     limits:
       memory: 512Mi
@@ -87,7 +87,7 @@ trivy:
   enabled: true
   resources:
     requests:
-      cpu: 100m
+      cpu: 25m
       memory: 256Mi
     limits:
       memory: 512Mi
@@ -96,7 +96,7 @@ trivy:
 jobservice:
   resources:
     requests:
-      cpu: 50m
+      cpu: 25m
       memory: 64Mi
     limits:
       memory: 256Mi
@@ -105,7 +105,7 @@ jobservice:
 portal:
   resources:
     requests:
-      cpu: 50m
+      cpu: 10m
       memory: 64Mi
     limits:
       memory: 128Mi

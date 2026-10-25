@@ -12,9 +12,9 @@ defaultSettings:
   # backupTarget: nfs://nas.haaloft.local:/backup/longhorn
   # backupTargetCredentialSecret: ""
 
-  # Guaranteed engine manager CPU
-  guaranteedEngineManagerCPU: 12
-  guaranteedReplicaManagerCPU: 12
+  # CPU reserved per instance-manager pod, as % of node CPU (default 12).
+  # Actual use is well under 5% of a 2-core node.
+  guaranteedInstanceManagerCPU: '{"v1":"5","v2":"5"}'
 
   # Storage reservation - leave 15% free on each node
   storageMinimalAvailablePercentage: 15
