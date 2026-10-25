@@ -108,6 +108,21 @@ ansible-playbook site.yml --tags harbor
 ansible-playbook site.yml --tags common
 ```
 
+### Updates and Kubernetes upgrades
+
+```bash
+# OS updates + RKE2 patch releases (e.g. 1.34.1 -> 1.34.3), one node at a time
+ansible-playbook playbooks/update-reboot.yml
+
+# Move to the next Kubernetes minor version (e.g. 1.34 -> 1.35), one node at a time
+ansible-playbook playbooks/upgrade-rke2.yml -e rke2_target_minor=1.35
+```
+
+RKE2 is installed from the `rancher-rke2` dnf repo, which is pinned to one minor
+version. `upgrade-rke2.yml` switches that repo to the target minor, upgrades the
+server first, then the agents. Minor versions can't be skipped, so go one at a
+time, and check the RKE2 release notes first.
+
 ### 4. DNS (automatic)
 
 DNS is handled automatically. After VM IP discovery, Ansible registers:
@@ -259,6 +274,8 @@ k8s-haaloft/
 │   │   ├── provision-vms.yml           # VM creation on KVM host
 │   │   ├── provision-vm-single.yml     # Single VM provisioning (included)
 │   │   ├── discover-vms.yml            # DHCP IP discovery from hypervisor
+│   │   ├── update-reboot.yml           # Rolling OS + RKE2 patch updates
+│   │   ├── upgrade-rke2.yml            # Rolling Kubernetes minor upgrade
 │   │   ├── teardown.yml                # Destroy everything (VMs + DNS)
 │   │   └── teardown-vm-single.yml      # Single VM teardown (included)
 │   └── roles/
