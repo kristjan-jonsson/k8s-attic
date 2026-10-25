@@ -65,6 +65,14 @@
   tags: [keycloak]
   when: services.keycloak | default(false)
 
+- name: Include External Secrets Operator
+  ansible.builtin.include_tasks:
+    file: external_secrets.yml
+    apply:
+      tags: [external-secrets]
+  tags: [external-secrets]
+  when: services.external_secrets | default(false)
+
 - name: Include ArgoCD
   ansible.builtin.include_tasks:
     file: argocd.yml

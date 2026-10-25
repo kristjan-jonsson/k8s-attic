@@ -28,6 +28,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
                           │ Longhorn        │  ← Persistent storage
                           │ cert-manager    │  ← TLS certificates
                           │ Vault           │  ← Secret management
+                          │ External Secrets│  ← Sync secrets into K8s
                           │ Keycloak        │  ← Identity / SSO
                           │ Harbor          │  ← Container registry
                           │ ArgoCD          │  ← GitOps deployments
@@ -44,6 +45,7 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 | Longhorn        | Distributed storage    | https://longhorn.haaloft.local    |
 | cert-manager    | TLS certificate mgmt   | -                                 |
 | Vault           | Secret management      | https://vault.haaloft.local       |
+| External Secrets | Sync secrets into K8s | -                                 |
 | Keycloak        | Identity & SSO         | https://auth.haaloft.local        |
 | Harbor          | Container registry     | https://registry.haaloft.local    |
 | ArgoCD          | GitOps deployments     | https://argocd.haaloft.local      |

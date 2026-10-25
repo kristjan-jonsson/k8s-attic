@@ -35,6 +35,7 @@
     - { name: bitnami, url: "https://charts.bitnami.com/bitnami" }
     - { name: harbor, url: "https://helm.goharbor.io" }
     - { name: argo, url: "https://argoproj.github.io/argo-helm" }
+    - { name: external-secrets, url: "https://charts.external-secrets.io" }
   environment:
     PATH: "/usr/local/bin:/usr/bin:/bin"
   changed_when: false
