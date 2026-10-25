@@ -2,6 +2,7 @@
 # ============================================================================
 # Discover DHCP-assigned VM IPs via virsh on localhost (KVM host)
 # and register them as in-memory inventory hosts.
+# Skipped when rke2_servers/rke2_agents already have hosts in inventory.yml.
 # ============================================================================
 - name: Discover VM IPs from localhost
   hosts: localhost
@@ -10,6 +11,11 @@
   tags: always
 
   tasks:
+    # Skip discovery when the cluster hosts are already listed in inventory.yml
+    - name: Skip discovery if inventory already has cluster hosts
+      ansible.builtin.meta: end_play
+      when: groups['rke2_cluster'] | default([]) | length > 0
+
     - name: Discover each VM IP
       ansible.builtin.include_tasks: discover-vm-single.yml
       loop: "{{ vms }}"
