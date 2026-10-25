@@ -1,0 +1,69 @@
+# ============================================================================
+# ArgoCD - GitOps continuous delivery
+# Install: helm install argocd argo/argo-cd -n argocd --create-namespace -f argocd-values.yaml
+# ============================================================================
+
+global:
+  domain: argocd.haaloft.local
+
+configs:
+  params:
+    # TLS ends at the NGINX ingress, so the ArgoCD server serves plain HTTP
+    server.insecure: true
+
+# No SSO - log in with the local admin user
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+server:
+  replicas: 1
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    tls: true
+    annotations:
+      cert-manager.io/cluster-issuer: haaloft-ca-issuer
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+controller:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+applicationSet:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
