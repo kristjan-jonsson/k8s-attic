@@ -92,12 +92,13 @@ grafana:
     annotations:
       cert-manager.io/cluster-issuer: haaloft-ca-issuer
 
+  # Grafana 13 uses ~250Mi at idle and was OOMKilled at a 256Mi limit
   resources:
     requests:
       cpu: 100m
-      memory: 128Mi
-    limits:
       memory: 256Mi
+    limits:
+      memory: 1Gi
 
   # The Longhorn volume is ReadWriteOnce, so a rolling update can't start the
   # new pod while the old one holds the volume. Stop the old pod first.
