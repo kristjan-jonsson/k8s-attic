@@ -42,6 +42,16 @@ longhorn_host: "longhorn.{{ domain }}"
 argocd_host: "argocd.{{ domain }}"
 sonarqube_host: "sonarqube.{{ domain }}"
 
+# --- Helm chart versions ---
+# Pinned to what's installed so a playbook run never upgrades by surprise.
+# Upgrade one at a time and read the release notes first. Longhorn only
+# supports upgrading one minor version at a time (1.11 -> 1.12 -> 1.13).
+longhorn_chart_version: "1.11.1"
+vault_chart_version: "0.32.0"
+cert_manager_chart_version: "v1.21.3"
+argocd_chart_version: "10.11.1"
+harbor_chart_version: "1.18.3"
+
 # --- cert-manager ---
 cert_issuer: haaloft-ca-issuer
 acme_email: your-email@example.com

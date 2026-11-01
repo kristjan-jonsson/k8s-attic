@@ -13,6 +13,7 @@
   ansible.builtin.command: >
     helm upgrade --install harbor harbor/harbor
     --namespace harbor --create-namespace
+    --version {{ harbor_chart_version }}
     --values /tmp/k8s-manifests/harbor/harbor-values.yaml
     --timeout 15m
   environment:

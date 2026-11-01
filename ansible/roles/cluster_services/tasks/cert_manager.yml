@@ -5,6 +5,7 @@
   ansible.builtin.command: >
     helm upgrade --install cert-manager jetstack/cert-manager
     --namespace cert-manager --create-namespace
+    --version {{ cert_manager_chart_version }}
     --values /tmp/k8s-manifests/cert-manager/cert-manager-values.yaml
     --set crds.enabled=true
     --wait --timeout 5m

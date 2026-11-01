@@ -5,6 +5,7 @@
   ansible.builtin.command: >
     helm upgrade --install vault hashicorp/vault
     --namespace vault --create-namespace
+    --version {{ vault_chart_version }}
     --values /tmp/k8s-manifests/vault/vault-values.yaml
     --timeout 5m
   environment:

@@ -19,6 +19,7 @@
   ansible.builtin.command: >
     helm upgrade --install argocd argo/argo-cd
     --namespace argocd --create-namespace
+    --version {{ argocd_chart_version }}
     --values /tmp/k8s-manifests/argocd/argocd-values.yaml
     --timeout 10m
   environment:

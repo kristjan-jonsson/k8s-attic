@@ -5,6 +5,7 @@
   ansible.builtin.command: >
     helm upgrade --install longhorn longhorn/longhorn
     --namespace longhorn-system --create-namespace
+    --version {{ longhorn_chart_version }}
     --values /tmp/k8s-manifests/storage/longhorn-values.yaml
     --wait --timeout 10m
   environment:
