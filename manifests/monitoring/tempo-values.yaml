@@ -1,0 +1,44 @@
+# ============================================================================
+# Tempo - trace storage (single binary, local disk on Longhorn)
+# Chart: grafana-community/tempo
+# Install: helm install tempo grafana-community/tempo \
+#            -n monitoring --version 3.2.1 -f tempo-values.yaml
+#
+# The OTel Collector sends traces to tempo.monitoring:4317 (OTLP gRPC).
+# Grafana queries Tempo at http://tempo.monitoring:3200
+# ============================================================================
+
+tempo:
+  retention: 72h
+  reportingEnabled: false
+
+  # Generate span metrics + service graph from traces and write them to Prometheus.
+  # Powers the "Service Graph" and RED metrics views on the Tempo data source in Grafana.
+  # Requires prometheusSpec.enableRemoteWriteReceiver: true (monitoring-values.yaml)
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: "http://monitoring-kube-prometheus-prometheus.monitoring:9090/api/v1/write"
+  overrides:
+    defaults:
+      metrics_generator:
+        processors:
+          - service-graphs
+          - span-metrics
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: 10Gi
+
+# --- Let Prometheus scrape Tempo's own metrics ---
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: monitoring

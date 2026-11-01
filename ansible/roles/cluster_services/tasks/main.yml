@@ -81,13 +81,39 @@
   tags: [argocd]
   when: services.argocd | default(false)
 
-- name: Include monitoring (Prometheus + Grafana)
+- name: Include monitoring (Prometheus + Alertmanager + Grafana)
   ansible.builtin.include_tasks:
     file: monitoring.yml
     apply:
       tags: [monitoring]
   tags: [monitoring]
   when: services.monitoring | default(false)
+
+# Loki, Tempo and the OTel Collector go after monitoring: they use its
+# ServiceMonitor CRD and send data to its Prometheus
+- name: Include Loki (logs)
+  ansible.builtin.include_tasks:
+    file: loki.yml
+    apply:
+      tags: [loki]
+  tags: [loki]
+  when: services.loki | default(false)
+
+- name: Include Tempo (traces)
+  ansible.builtin.include_tasks:
+    file: tempo.yml
+    apply:
+      tags: [tempo]
+  tags: [tempo]
+  when: services.tempo | default(false)
+
+- name: Include OpenTelemetry Collector
+  ansible.builtin.include_tasks:
+    file: otel_collector.yml
+    apply:
+      tags: [otel-collector]
+  tags: [otel-collector]
+  when: services.otel_collector | default(false)
 
 - name: Include Home Assistant
   ansible.builtin.include_tasks:

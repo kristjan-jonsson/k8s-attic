@@ -1,6 +1,10 @@
 # ============================================================================
-# kube-prometheus-stack - Prometheus + Grafana + Node Exporter
+# kube-prometheus-stack - Prometheus + Alertmanager + Grafana + Node Exporter
 # Chart: prometheus-community/kube-prometheus-stack
+#
+# Logs (Loki), traces (Tempo) and the OTel Collector are separate releases in
+# the same namespace - see loki-values.yaml, tempo-values.yaml,
+# otel-collector-values.yaml
 # ============================================================================
 
 # --- Prometheus ---
@@ -44,6 +48,28 @@ prometheus:
       limits:
         memory: 2Gi
 
+    # --- Push endpoints (in-cluster only, no auth - never expose via ingress) ---
+    # OTLP metrics from the OTel Collector:
+    #   http://monitoring-kube-prometheus-prometheus.monitoring:9090/api/v1/otlp/v1/metrics
+    enableOTLPReceiver: true
+    # Remote write from Tempo's metrics generator (span metrics + service graph)
+    enableRemoteWriteReceiver: true
+
+    # OTLP resource attributes to keep as labels on every series.
+    # service.name / service.instance.id always become job / instance;
+    # all other resource attributes go to the target_info metric.
+    otlp:
+      promoteResourceAttributes:
+        - service.version
+        - deployment.environment.name
+        - k8s.namespace.name
+        - k8s.deployment.name
+        - k8s.pod.name
+
+    # Pushed samples can arrive slightly late or out of order
+    tsdb:
+      outOfOrderTimeWindow: 30m
+
 # --- Grafana ---
 grafana:
   adminUser: admin
@@ -73,6 +99,52 @@ grafana:
     limits:
       memory: 256Mi
 
+  # The Longhorn volume is ReadWriteOnce, so a rolling update can't start the
+  # new pod while the old one holds the volume. Stop the old pod first.
+  deploymentStrategy:
+    type: Recreate
+
+  # Loki + Tempo data sources (Prometheus and Alertmanager are added by the chart).
+  # They link to each other: trace -> logs, log line -> trace, trace -> metrics.
+  # UIDs are fixed so the links keep working. "$$" escapes "$" in Grafana provisioning.
+  additionalDataSources:
+    - name: Loki
+      uid: loki
+      type: loki
+      access: proxy
+      url: http://loki.monitoring:3100
+      jsonData:
+        derivedFields:
+          # OTLP logs carry trace_id as structured metadata
+          - name: TraceID
+            matcherType: label
+            matcherRegex: trace_id
+            datasourceUid: tempo
+            url: "$${__value.raw}"
+            urlDisplayLabel: View trace
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://tempo.monitoring:3200
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          spanStartTimeShift: "-5m"
+          spanEndTimeShift: "5m"
+          filterByTraceID: true
+          tags:
+            - key: service.name
+              value: service_name
+        tracesToMetrics:
+          datasourceUid: prometheus
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+        lokiSearch:
+          datasourceUid: loki
+
   # Default dashboards are included automatically:
   # - K8S cluster overview
   # - Node exporter
@@ -83,7 +155,46 @@ grafana:
 
 # --- Alertmanager ---
 alertmanager:
-  enabled: false  # Enable later if you want alerting
+  enabled: true
+  # In-cluster only: monitoring-kube-prometheus-alertmanager.monitoring:9093
+  # Grafana gets an Alertmanager data source automatically (Alerting -> Alert rules / Silences).
+  alertmanagerSpec:
+    retention: 120h
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 128Mi
+
+  # The chart's default config sends everything to a "null" receiver, so alerts
+  # show up in Grafana / Alertmanager but are not delivered anywhere yet.
+  # To get notified, override alertmanager.config with a real receiver, e.g.:
+  #
+  # config:
+  #   route:
+  #     receiver: email
+  #     group_by: [namespace, alertname]
+  #     routes:
+  #       - receiver: "null"
+  #         matchers: [alertname = "Watchdog"]
+  #   receivers:
+  #     - name: "null"
+  #     - name: email
+  #       email_configs:
+  #         - to: you@example.com
+  #           from: alertmanager@haaloft.local
+  #           smarthost: smtp.example.com:587
+  #           auth_username: you@example.com
+  #           auth_password: REPLACE_ME
 
 # --- Node Exporter (runs on all nodes) ---
 prometheus-node-exporter:

@@ -1,0 +1,48 @@
+---
+# Tempo - trace storage (single binary). Receives OTLP traces from the OTel Collector.
+# Needs the monitoring stack first (ServiceMonitor CRD, Prometheus remote write, Grafana data source).
+
+# Also added in the helm role; repeated here so `--tags tempo` works on its own
+- name: Add grafana-community Helm repo
+  ansible.builtin.command: helm repo add grafana-community https://grafana-community.github.io/helm-charts
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+
+- name: Install Tempo
+  ansible.builtin.command: >
+    helm upgrade --install tempo grafana-community/tempo
+    --namespace monitoring --create-namespace
+    --version {{ tempo_chart_version }}
+    --values /tmp/k8s-manifests/monitoring/tempo-values.yaml
+    --timeout 10m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Tempo to be ready
+  ansible.builtin.shell: |
+    kubectl -n monitoring rollout status statefulset/tempo --timeout=300s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: tempo_ready
+  until: tempo_ready is not failed
+  changed_when: false
+
+- name: Display Tempo info
+  ansible.builtin.debug:
+    msg: |
+      Tempo {{ tempo_chart_version }} deployed in namespace monitoring.
+      Query (Grafana): http://tempo.monitoring:3200
+      OTLP traces in:  tempo.monitoring:4317 (fed by the OTel Collector)
+      Retention:       72h / 10Gi volume

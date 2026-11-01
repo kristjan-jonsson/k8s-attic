@@ -32,6 +32,10 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
                           │ Keycloak        │  ← Identity / SSO
                           │ Harbor          │  ← Container registry
                           │ ArgoCD          │  ← GitOps deployments
+                          │ Prometheus      │  ← Metrics + alerts
+                          │ Grafana         │  ← Dashboards
+                          │ Loki / Tempo    │  ← Logs / traces
+                          │ OTel Collector  │  ← OTLP endpoint for apps
                           │ CoreDNS         │  ← Service discovery
                           └─────────────────┘
 ```
@@ -49,6 +53,11 @@ A complete Kubernetes home lab running on KVM with RKE2, fully automated with An
 | Keycloak        | Identity & SSO         | https://auth.haaloft.local        |
 | Harbor          | Container registry     | https://registry.haaloft.local    |
 | ArgoCD          | GitOps deployments     | https://argocd.haaloft.local      |
+| Prometheus + Alertmanager | Metrics & alerting | In-cluster only              |
+| Grafana         | Dashboards, logs, traces | https://grafana.haaloft.local   |
+| Loki            | Log storage            | In-cluster only                   |
+| Tempo           | Trace storage          | In-cluster only                   |
+| OTel Collector  | OTLP endpoint for apps | `otel-collector.monitoring:4317`  |
 | CoreDNS         | Service discovery      | Built into RKE2                   |
 
 ## Prerequisites
@@ -257,6 +266,41 @@ spec:
 }
 ```
 
+### Observability (.NET with OpenTelemetry)
+
+Apps send metrics, logs and traces over OTLP to the shared OTel Collector, which
+routes them to Prometheus, Loki and Tempo. Everything shows up in Grafana, with
+links between a trace, its logs and its metrics.
+
+```bash
+dotnet add package OpenTelemetry.Extensions.Hosting
+dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+dotnet add package OpenTelemetry.Instrumentation.AspNetCore
+dotnet add package OpenTelemetry.Instrumentation.Http
+dotnet add package OpenTelemetry.Instrumentation.Runtime
+```
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("my-dotnet-app"))
+    .WithTracing(t => t.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation())
+    .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddRuntimeInstrumentation())
+    .WithLogging()
+    .UseOtlpExporter();
+```
+
+```yaml
+# In the Deployment's container spec
+env:
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: http://otel-collector.monitoring:4317
+  - name: OTEL_RESOURCE_ATTRIBUTES
+    value: deployment.environment.name=test
+```
+
+ServiceMonitors, PodMonitors and PrometheusRules for your apps need the label
+`release: monitoring` to be picked up by Prometheus.
+
 ## File Structure
 
 ```
@@ -301,6 +345,10 @@ k8s-haaloft/
 │       │   │   ├── longhorn.yml
 │       │   │   ├── vault.yml
 │       │   │   ├── keycloak.yml
+│       │   │   ├── monitoring.yml      # Prometheus + Alertmanager + Grafana
+│       │   │   ├── loki.yml
+│       │   │   ├── tempo.yml
+│       │   │   ├── otel_collector.yml
 │       │   │   └── coredns.yml
 │       │   └── templates/
 │       │       └── coredns-helmchartconfig.yaml.j2
@@ -320,6 +368,11 @@ k8s-haaloft/
     │   └── vault-values.yaml
     ├── harbor/
     │   └── harbor-values.yaml
+    ├── monitoring/
+    │   ├── monitoring-values.yaml      # kube-prometheus-stack
+    │   ├── loki-values.yaml
+    │   ├── tempo-values.yaml
+    │   └── otel-collector-values.yaml
     └── cert-manager/
         ├── cert-manager-values.yaml
         └── cluster-issuers.yaml

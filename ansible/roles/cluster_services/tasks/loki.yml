@@ -1,0 +1,48 @@
+---
+# Loki - log storage (single binary). Receives OTLP logs from the OTel Collector.
+# Needs the monitoring stack first (ServiceMonitor CRD, Grafana data source).
+
+# Also added in the helm role; repeated here so `--tags loki` works on its own
+- name: Add grafana-community Helm repo
+  ansible.builtin.command: helm repo add grafana-community https://grafana-community.github.io/helm-charts
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+
+- name: Install Loki
+  ansible.builtin.command: >
+    helm upgrade --install loki grafana-community/loki
+    --namespace monitoring --create-namespace
+    --version {{ loki_chart_version }}
+    --values /tmp/k8s-manifests/monitoring/loki-values.yaml
+    --timeout 10m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for Loki to be ready
+  ansible.builtin.shell: |
+    kubectl -n monitoring rollout status statefulset/loki --timeout=300s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: loki_ready
+  until: loki_ready is not failed
+  changed_when: false
+
+- name: Display Loki info
+  ansible.builtin.debug:
+    msg: |
+      Loki {{ loki_chart_version }} deployed in namespace monitoring.
+      Query (Grafana): http://loki.monitoring:3100
+      OTLP logs in:    http://loki.monitoring:3100/otlp (fed by the OTel Collector)
+      Retention:       14 days / 20Gi volume

@@ -48,6 +48,12 @@ acme_email: your-email@example.com
 # --- External Secrets Operator ---
 external_secrets_chart_version: "2.12.0"
 
+# --- Observability (namespace: monitoring) ---
+monitoring_chart_version: "92.13.1"       # kube-prometheus-stack (currently installed)
+loki_chart_version: "20.2.1"              # grafana-community/loki   -> Loki 3.7
+tempo_chart_version: "3.2.1"              # grafana-community/tempo  -> Tempo 3.1
+otel_collector_chart_version: "0.178.1"   # open-telemetry/opentelemetry-collector -> 0.163
+
 # --- Keycloak ---
 keycloak_admin_user: admin
 keycloak_admin_password: "changeme-use-vault-secret"
@@ -66,7 +72,10 @@ services:
   vault: true
   keycloak: true
   harbor: true
-  monitoring: true
+  monitoring: true        # Prometheus + Alertmanager + Grafana
+  loki: true              # Logs (needs monitoring)
+  tempo: true             # Traces (needs monitoring)
+  otel_collector: true    # OTLP endpoint for apps (needs monitoring)
   argocd: true
   external_secrets: true
   homeassistant: false
