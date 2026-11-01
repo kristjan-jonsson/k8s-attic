@@ -36,6 +36,7 @@
     - { name: harbor, url: "https://helm.goharbor.io" }
     - { name: argo, url: "https://argoproj.github.io/argo-helm" }
     - { name: external-secrets, url: "https://charts.external-secrets.io" }
+    - { name: sonarqube, url: "https://SonarSource.github.io/helm-chart-sonarqube" }
     - { name: grafana-community, url: "https://grafana-community.github.io/helm-charts" }
     - { name: open-telemetry, url: "https://open-telemetry.github.io/opentelemetry-helm-charts" }
   environment:

@@ -1,0 +1,87 @@
+---
+# SonarQube Community Build - code quality and security analysis
+
+# Also added in the helm role; repeated here so `--tags sonarqube` works on its own
+- name: Add sonarqube Helm repo
+  ansible.builtin.command: helm repo add sonarqube https://SonarSource.github.io/helm-chart-sonarqube
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  failed_when: false
+
+- name: Update Helm repos
+  ansible.builtin.command: helm repo update
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+
+- name: Create SonarQube namespace
+  ansible.builtin.shell: |
+    kubectl create namespace sonarqube --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+
+# Holds the DB password and the monitoring passcode used by the health probes
+- name: Create SonarQube database secret
+  ansible.builtin.shell: |
+    kubectl -n sonarqube create secret generic sonarqube-db \
+      --from-literal=password='{{ sonarqube_pg_password }}' \
+      --from-literal=monitoring-passcode='{{ sonarqube_monitoring_passcode }}' \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  changed_when: false
+  no_log: true
+
+- name: Deploy SonarQube PostgreSQL
+  ansible.builtin.command: >
+    kubectl apply -f /tmp/k8s-manifests/sonarqube/sonarqube-postgresql.yaml
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+- name: Wait for SonarQube PostgreSQL to be ready
+  ansible.builtin.shell: |
+    kubectl -n sonarqube wait --for=condition=Available deployment/sonarqube-postgresql --timeout=300s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 3
+  delay: 30
+  register: sonar_pg_ready
+  until: sonar_pg_ready is not failed
+  changed_when: false
+
+- name: Install SonarQube
+  ansible.builtin.command: >
+    helm upgrade --install sonarqube sonarqube/sonarqube
+    --namespace sonarqube
+    --version {{ sonarqube_chart_version }}
+    --values /tmp/k8s-manifests/sonarqube/sonarqube-values.yaml
+    --timeout 15m
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+
+# First start creates the database schema and Elasticsearch index, which takes a few minutes
+- name: Wait for SonarQube to be ready
+  ansible.builtin.shell: |
+    kubectl -n sonarqube rollout status statefulset/sonarqube-sonarqube --timeout=600s
+  environment:
+    KUBECONFIG: /home/rke/.kube/config
+    PATH: "/var/lib/rancher/rke2/bin:/usr/local/bin:/usr/bin:/bin"
+  retries: 2
+  delay: 30
+  register: sonar_ready
+  until: sonar_ready is not failed
+  changed_when: false
+
+- name: Display SonarQube info
+  ansible.builtin.debug:
+    msg: |
+      SonarQube {{ sonarqube_chart_version }} deployed!
+      UI:       https://{{ sonarqube_host }}
+      Login:    admin / admin (you must change it on first login)

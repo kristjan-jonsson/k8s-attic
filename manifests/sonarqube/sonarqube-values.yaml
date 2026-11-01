@@ -1,0 +1,60 @@
+# ============================================================================
+# SonarQube Community Build - code quality and security analysis
+# Install: helm install sonarqube sonarqube/sonarqube -n sonarqube --create-namespace \
+#            --version 2026.5.1003 -f sonarqube-values.yaml
+# Needs the sonarqube-db secret and sonarqube-postgresql.yaml applied first.
+# ============================================================================
+
+# Free Community Build (not the paid developer/enterprise editions)
+community:
+  enabled: true
+
+# External PostgreSQL from sonarqube-postgresql.yaml
+jdbcOverwrite:
+  enabled: true
+  jdbcUrl: "jdbc:postgresql://sonarqube-postgresql:5432/sonarqube"
+  jdbcUsername: sonarqube
+  jdbcSecretName: sonarqube-db
+  jdbcSecretPasswordKey: password
+
+# Required by the chart; used by the health probes
+monitoringPasscodeSecretName: sonarqube-db
+monitoringPasscodeSecretKey: monitoring-passcode
+
+# Keeps the Elasticsearch index and installed plugins across restarts
+persistence:
+  enabled: true
+  storageClass: longhorn
+  size: 10Gi
+
+# The init container sets vm.max_map_count on the node (Elasticsearch needs it)
+initSysctl:
+  enabled: true
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    - name: sonarqube.haaloft.local
+      path: /
+      pathType: Prefix
+  annotations:
+    cert-manager.io/cluster-issuer: haaloft-ca-issuer
+    # Analysis reports from scanners can be large
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+  tls:
+    - secretName: sonarqube-tls
+      hosts:
+        - sonarqube.haaloft.local
+
+# SonarQube runs web, compute engine and Elasticsearch in one pod.
+# 2Gi is about the minimum; no CPU limit so startup isn't throttled.
+resources:
+  requests:
+    cpu: 200m
+    memory: 2Gi
+    ephemeral-storage: 1Gi
+  limits:
+    cpu: null
+    memory: 4Gi
+    ephemeral-storage: 10Gi

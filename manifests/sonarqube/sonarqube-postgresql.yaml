@@ -1,0 +1,84 @@
+# ============================================================================
+# PostgreSQL for SonarQube
+# The SonarQube chart no longer bundles a database, so we run our own.
+# The password comes from the sonarqube-db secret, created by Ansible.
+# ============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sonarqube-postgresql-data
+  namespace: sonarqube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-db
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarqube-postgresql
+  namespace: sonarqube
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sonarqube-postgresql
+  template:
+    metadata:
+      labels:
+        app: sonarqube-postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: docker.io/library/postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: sonarqube
+            - name: POSTGRES_USER
+              value: sonarqube
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sonarqube-db
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "sonarqube", "-d", "sonarqube"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 25m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: sonarqube-postgresql-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarqube-postgresql
+  namespace: sonarqube
+spec:
+  selector:
+    app: sonarqube-postgresql
+  ports:
+    - port: 5432
+      targetPort: 5432

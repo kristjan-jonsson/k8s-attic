@@ -40,6 +40,7 @@ keycloak_host: "auth.{{ domain }}"
 vault_host: "vault.{{ domain }}"
 longhorn_host: "longhorn.{{ domain }}"
 argocd_host: "argocd.{{ domain }}"
+sonarqube_host: "sonarqube.{{ domain }}"
 
 # --- cert-manager ---
 cert_issuer: haaloft-ca-issuer
@@ -47,6 +48,11 @@ acme_email: your-email@example.com
 
 # --- External Secrets Operator ---
 external_secrets_chart_version: "2.12.0"
+
+# --- SonarQube ---
+sonarqube_chart_version: "2026.5.1003"
+sonarqube_pg_password: "changeme-pg-sonarqube"
+sonarqube_monitoring_passcode: "changeme-sonarqube-monitoring"
 
 # --- Observability (namespace: monitoring) ---
 monitoring_chart_version: "92.13.1"       # kube-prometheus-stack (currently installed)
@@ -78,6 +84,7 @@ services:
   otel_collector: true    # OTLP endpoint for apps (needs monitoring)
   argocd: true
   external_secrets: true
+  sonarqube: true
   homeassistant: false
   mqtt: false
   zigbee2mqtt: false

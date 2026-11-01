@@ -81,6 +81,14 @@
   tags: [argocd]
   when: services.argocd | default(false)
 
+- name: Include SonarQube
+  ansible.builtin.include_tasks:
+    file: sonarqube.yml
+    apply:
+      tags: [sonarqube]
+  tags: [sonarqube]
+  when: services.sonarqube | default(false)
+
 - name: Include monitoring (Prometheus + Alertmanager + Grafana)
   ansible.builtin.include_tasks:
     file: monitoring.yml
