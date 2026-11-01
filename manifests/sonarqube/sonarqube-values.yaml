@@ -21,7 +21,10 @@ jdbcOverwrite:
 monitoringPasscodeSecretName: sonarqube-db
 monitoringPasscodeSecretKey: monitoring-passcode
 
-# Keeps the Elasticsearch index and installed plugins across restarts
+# Keeps the Elasticsearch index and installed plugins across restarts.
+# The real data is in PostgreSQL, so this volume can be rebuilt.
+# The Longhorn volume was lowered to 1 replica by hand (numberOfReplicas on
+# the volume). A recreated PVC gets the storage class default (3) again.
 persistence:
   enabled: true
   storageClass: longhorn

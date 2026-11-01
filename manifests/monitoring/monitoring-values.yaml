@@ -15,6 +15,8 @@ prometheus:
     retentionSize: "8GB"
 
     # Storage for metrics
+    # The Longhorn volume was lowered to 2 replicas by hand (numberOfReplicas on
+    # the volume). A recreated PVC gets the storage class default (3) again.
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -75,6 +77,8 @@ grafana:
   adminUser: admin
   adminPassword: changeme-grafana-admin
 
+  # The Longhorn volume was lowered to 2 replicas by hand (numberOfReplicas on
+  # the volume). A recreated PVC gets the storage class default (3) again.
   persistence:
     enabled: true
     storageClassName: longhorn

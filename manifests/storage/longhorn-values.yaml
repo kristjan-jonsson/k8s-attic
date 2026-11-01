@@ -18,7 +18,10 @@ defaultSettings:
 
   # Storage reservation - leave 15% free on each node
   storageMinimalAvailablePercentage: 15
-  storageOverProvisioningPercentage: 100
+  # Longhorn reserves the full size of every replica, but volumes use ~25% of
+  # what they reserve. 200% lets nodes reserve up to 2x their schedulable disk;
+  # real usage is what has to stay below the disk size.
+  storageOverProvisioningPercentage: 200
 
   # Auto-delete workload pod when volume is detached unexpectedly
   autoDeletePodWhenVolumeDetachedUnexpectedly: true
