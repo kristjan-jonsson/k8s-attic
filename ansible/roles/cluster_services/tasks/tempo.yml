@@ -45,4 +45,4 @@
       Tempo {{ tempo_chart_version }} deployed in namespace monitoring.
       Query (Grafana): http://tempo.monitoring:3200
       OTLP traces in:  tempo.monitoring:4317 (fed by the OTel Collector)
-      Retention:       72h / 10Gi volume
+      Retention:       72h / 10Gi volume (1 Longhorn replica)

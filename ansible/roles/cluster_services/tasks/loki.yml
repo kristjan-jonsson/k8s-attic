@@ -45,4 +45,4 @@
       Loki {{ loki_chart_version }} deployed in namespace monitoring.
       Query (Grafana): http://loki.monitoring:3100
       OTLP logs in:    http://loki.monitoring:3100/otlp (fed by the OTel Collector)
-      Retention:       14 days / 20Gi volume
+      Retention:       14 days / 10Gi volume (1 Longhorn replica)

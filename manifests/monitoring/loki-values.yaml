@@ -48,10 +48,14 @@ loki:
 
 singleBinary:
   replicas: 1
+  # One Longhorn replica: logs are less critical than databases, and 3 x 20Gi
+  # didn't fit in Longhorn's schedulable space. The volume can be grown later
+  # (allowVolumeExpansion), but the storage class can't change without
+  # recreating the StatefulSet and PVC.
   persistence:
     enabled: true
-    storageClass: longhorn
-    size: 20Gi
+    storageClass: longhorn-single
+    size: 10Gi
   resources:
     requests:
       cpu: 100m

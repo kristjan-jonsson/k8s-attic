@@ -32,9 +32,12 @@ tempo:
     limits:
       memory: 1Gi
 
+# One Longhorn replica: traces are short-lived (72h) and less critical than
+# databases, and this keeps Longhorn's schedulable space free for them. The
+# storage class can't change without recreating the StatefulSet and PVC.
 persistence:
   enabled: true
-  storageClassName: longhorn
+  storageClassName: longhorn-single
   size: 10Gi
 
 # --- Let Prometheus scrape Tempo's own metrics ---
