@@ -13,7 +13,7 @@ cluster_name: haaloft
 # Ansible, e.g. `kind create cluster --name kind-cluster`) - see README.md.
 kind_cluster_name: kind-cluster
 kind_node_container: "{{ kind_cluster_name }}-control-plane"
-kind_container_engine: podman    # or: docker
+kind_container_engine:  "{{ lookup('ansible.builtin.env', 'KIND_CONTAINER_ENGINE') }}"
 kube_context: "kind-{{ kind_cluster_name }}"
 
 # Host ports the kind cluster's control-plane container maps to the node's
