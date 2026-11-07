@@ -13,8 +13,10 @@ cluster_name: haaloft
 # Ansible, e.g. `kind create cluster --name kind-cluster`) - see README.md.
 kind_cluster_name: kind-cluster
 kind_node_container: "{{ kind_cluster_name }}-control-plane"
-kind_container_engine:  "{{ lookup('ansible.builtin.env', 'KIND_CONTAINER_ENGINE') }}"
 kube_context: "kind-{{ kind_cluster_name }}"
+
+# lookup if you are running podman or docker on wsl instance
+kind_container_engine: "{{ lookup('ansible.builtin.env', 'KIND_CONTAINER_ENGINE') or lookup('ansible.builtin.pipe', 'for e in podman docker; do command -v $e >/dev/null && echo $e && break; done; true') }}"
 
 # Host ports the kind cluster's control-plane container maps to the node's
 # 80/443 (set at `kind create cluster` time via extraPortMappings). Check
