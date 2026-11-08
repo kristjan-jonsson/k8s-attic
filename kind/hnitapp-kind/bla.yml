@@ -47,7 +47,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: registry.haaloft.local/library/postgres:15
+          image: registry.{{ domain }}/library/postgres:15
           imagePullPolicy: IfNotPresent
           ports:
             - name: postgres
@@ -130,7 +130,7 @@ spec:
       # ready makes startup deterministic instead of relying on that restart.
       initContainers:
         - name: wait-for-postgres
-          image: registry.haaloft.local/library/postgres:15
+          image: registry.{{ domain }}/library/postgres:15
           command:
             - sh
             - -c
@@ -141,7 +141,7 @@ spec:
               done
       containers:
         - name: hnitapp
-          image: registry.haaloft.local/library/hnitapp-api:latest
+          image: registry.{{ domain }}/library/hnitapp-api:latest
           imagePullPolicy: Always
           ports:
             - name: http
@@ -208,10 +208,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - hnitapp.haaloft.local
+        - hnitapp.{{ domain }}
       secretName: hnitapp-tls
   rules:
-    - host: hnitapp.haaloft.local
+    - host: hnitapp.{{ domain }}
       http:
         paths:
           - path: /

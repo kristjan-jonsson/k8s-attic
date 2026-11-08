@@ -39,10 +39,10 @@ data:
           "enabled": true,
           "clientAuthenticatorType": "client-secret",
           "redirectUris": [
-            "https://myapp.haaloft.local/*"
+            "https://myapp.{{ domain }}/*"
           ],
           "webOrigins": [
-            "https://myapp.haaloft.local"
+            "https://myapp.{{ domain }}"
           ],
           "standardFlowEnabled": true,
           "directAccessGrantsEnabled": false,

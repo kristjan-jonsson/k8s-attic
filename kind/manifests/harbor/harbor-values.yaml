@@ -12,7 +12,7 @@ expose:
       secretName: harbor-tls
   ingress:
     hosts:
-      core: registry.haaloft.local
+      core: registry.{{ domain }}
     className: nginx
     annotations:
       cert-manager.io/cluster-issuer: haaloft-ca-issuer
@@ -23,7 +23,7 @@ expose:
 # Note: matches the kind cluster's mapped ingress https port (see
 # group_vars/all.yml: ingress_https_port) - Harbor uses this for redirects
 # and registry v2 API responses, so it must match what clients actually use.
-externalURL: https://registry.haaloft.local:9443
+externalURL: https://registry.{{ domain }}:9443
 
 # Admin password
 harborAdminPassword: changeme-harbor-admin

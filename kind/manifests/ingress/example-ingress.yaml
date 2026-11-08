@@ -11,16 +11,16 @@ metadata:
     cert-manager.io/cluster-issuer: haaloft-ca-issuer
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Uncomment to protect with Keycloak via OAuth2 Proxy
-    # nginx.ingress.kubernetes.io/auth-url: "https://oauth2.haaloft.local/oauth2/auth"
-    # nginx.ingress.kubernetes.io/auth-signin: "https://oauth2.haaloft.local/oauth2/start?rd=$scheme://$host$request_uri"
+    # nginx.ingress.kubernetes.io/auth-url: "https://oauth2.{{ domain }}/oauth2/auth"
+    # nginx.ingress.kubernetes.io/auth-signin: "https://oauth2.{{ domain }}/oauth2/start?rd=$scheme://$host$request_uri"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - myapp.haaloft.local
+        - myapp.{{ domain }}
       secretName: myapp-tls
   rules:
-    - host: myapp.haaloft.local
+    - host: myapp.{{ domain }}
       http:
         paths:
           - path: /

@@ -12,7 +12,7 @@ spec:
   selfSigned: {}
 
 ---
-# --- Internal CA (recommended for local *.haaloft.local hostnames) ---
+# --- Internal CA (recommended for local *.{{ domain }} hostnames) ---
 # Step 1: Create a self-signed CA certificate
 apiVersion: cert-manager.io/v1
 kind: Certificate

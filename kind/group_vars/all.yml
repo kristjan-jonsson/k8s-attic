@@ -3,10 +3,8 @@
 # ============================================================================
 
 # --- Domain ---
-# Kept identical to ansible/'s domain since the manifests under manifests/
-# hardcode *.haaloft.local hostnames (not templated, same convention as ansible/).
-domain: haaloft.local
-cluster_name: haaloft
+# Use whatever domain but if domain localtest.me is used it resolves to 127.0.0.1 without any effort
+domain: localtest.me
 
 # --- kind cluster ---
 # This automation assumes the kind cluster already exists (created outside

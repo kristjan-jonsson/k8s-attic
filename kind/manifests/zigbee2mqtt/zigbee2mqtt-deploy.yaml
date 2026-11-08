@@ -157,10 +157,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - zigbee.haaloft.local
+        - zigbee.{{ domain }}
       secretName: zigbee2mqtt-tls
   rules:
-    - host: zigbee.haaloft.local
+    - host: zigbee.{{ domain }}
       http:
         paths:
           - path: /

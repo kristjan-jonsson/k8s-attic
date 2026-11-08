@@ -95,7 +95,7 @@
   changed_when: true
 
 - name: Make {{ harbor_host }} resolvable inside the kind node
-  # containerd (inside the node) has no DNS for haaloft.local - it only reaches the
+  # containerd (inside the node) has no DNS for {{ domain }} - it only reaches the
   # registry through the ingress controller's hostPort, which is bound on the node's
   # OWN network namespace, so 127.0.0.1 from inside the node reaches it directly.
   ansible.builtin.shell: >

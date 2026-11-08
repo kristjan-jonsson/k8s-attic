@@ -33,7 +33,7 @@ data:
       cat > "$CONFIG" <<'EOF'
     homeassistant:
       name: Home
-      external_url: "https://home.haaloft.local"
+      external_url: "https://home.{{ domain }}"
       internal_url: "http://homeassistant.homeassistant.svc.cluster.local:80"
     http:
       use_x_forwarded_for: true
@@ -155,10 +155,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - home.haaloft.local
+        - home.{{ domain }}
       secretName: homeassistant-tls
   rules:
-    - host: home.haaloft.local
+    - host: home.{{ domain }}
       http:
         paths:
           - path: /

@@ -45,11 +45,11 @@ server:
     enabled: true
     ingressClassName: nginx
     hosts:
-      - host: vault.haaloft.local
+      - host: vault.{{ domain }}
     tls:
       - secretName: vault-tls
         hosts:
-          - vault.haaloft.local
+          - vault.{{ domain }}
     annotations:
       cert-manager.io/cluster-issuer: haaloft-ca-issuer
 

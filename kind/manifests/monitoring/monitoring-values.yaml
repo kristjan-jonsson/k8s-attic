@@ -47,11 +47,11 @@ grafana:
     enabled: true
     ingressClassName: nginx
     hosts:
-      - grafana.haaloft.local
+      - grafana.{{ domain }}
     tls:
       - secretName: grafana-tls
         hosts:
-          - grafana.haaloft.local
+          - grafana.{{ domain }}
     annotations:
       cert-manager.io/cluster-issuer: haaloft-ca-issuer
 

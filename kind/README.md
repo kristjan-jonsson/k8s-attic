@@ -83,10 +83,10 @@ ansible-playbook site.yml --tags harbor          # just (re)deploy Harbor
 
 ## DNS and ports
 
-`roles/hosts_dns` manages static `/etc/hosts` entries pointing `*.haaloft.local` at `127.0.0.1`.
+`roles/hosts_dns` manages static `/etc/hosts` entries pointing `*.{{ domain }}` at `127.0.0.1`.
 kind's ingress is reached through the host ports mapped when the cluster was created
 (`ingress_http_port`/`ingress_https_port` in `group_vars/all.yml`, default `9090`/`9443`) -
-**not** 80/443 - so include the port in every URL, e.g. `https://vault.haaloft.local:9443`.
+**not** 80/443 - so include the port in every URL, e.g. `https://vault.{{ domain }}:9443`.
 
 ## Services
 
@@ -106,9 +106,9 @@ there, so in-cluster pulls/pushes work out of the box. To push from your Mac's d
 trust the CA locally too:
 ```bash
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain .haaloft-ca.crt
-docker login registry.haaloft.local:9443
-docker tag myapp:latest registry.haaloft.local:9443/library/myapp:latest
-docker push registry.haaloft.local:9443/library/myapp:latest
+docker login registry.{{ domain }}:9443
+docker tag myapp:latest registry.{{ domain }}:9443/library/myapp:latest
+docker push registry.{{ domain }}:9443/library/myapp:latest
 ```
 
 ## Teardown
