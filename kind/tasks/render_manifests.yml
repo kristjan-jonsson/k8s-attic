@@ -1,0 +1,36 @@
+---
+# Render everything under manifests/ through Ansible's template engine so
+# variables like {{ domain }} (group_vars/all.yml) are filled in, then point
+# manifests_dir at the rendered copy. kubectl/helm only ever see the result.
+# Imported (static) from the cluster_services and harbor roles so it inherits
+# their tags and runs for e.g. `--tags harbor` too.
+
+- name: Find manifest files
+  ansible.builtin.find:
+    paths: "{{ playbook_dir }}/manifests"
+    patterns: "*.yaml,*.yml"
+    recurse: true
+  register: manifest_files
+  become: false
+
+- name: Create rendered manifest directories
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/.rendered-manifests/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ manifest_files.files | map(attribute='path') | map('relpath', playbook_dir ~ '/manifests') | map('dirname') | unique | list }}"
+  become: false
+
+- name: Render manifests
+  ansible.builtin.template:
+    src: "{{ item.path }}"
+    dest: "{{ playbook_dir }}/.rendered-manifests/{{ item.path | relpath(playbook_dir ~ '/manifests') }}"
+    mode: "0644"
+  loop: "{{ manifest_files.files }}"
+  loop_control:
+    label: "{{ item.path | relpath(playbook_dir ~ '/manifests') }}"
+  become: false
+
+- name: Use rendered manifests
+  ansible.builtin.set_fact:
+    manifests_dir: "{{ playbook_dir }}/.rendered-manifests"

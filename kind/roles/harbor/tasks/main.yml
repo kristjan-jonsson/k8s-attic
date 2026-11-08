@@ -10,9 +10,8 @@
 # real RKE2 VMs.
 # ============================================================================
 
-- name: Set manifests path fact
-  ansible.builtin.set_fact:
-    manifests_dir: "{{ playbook_dir }}/manifests"
+- name: Render manifests (fills in group_vars like domain)
+  ansible.builtin.import_tasks: "{{ playbook_dir }}/tasks/render_manifests.yml"
 
 - name: Ensure harbor namespace exists
   ansible.builtin.command: >

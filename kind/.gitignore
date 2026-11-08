@@ -7,3 +7,4 @@
 .keycloak-deploy.yaml
 kubeconfig
 *.retry
+.rendered-manifests/
